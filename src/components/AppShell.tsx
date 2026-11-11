@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getMe } from "@/lib/data";
+import { startLineLogin } from "@/lib/supabase";
 import type { Me } from "@/lib/types";
 import Logo from "./Logo";
 import Mascot from "./Mascot";
@@ -23,15 +24,19 @@ export default function AppShell() {
   const [tab, setTab] = useState<TabId>("schedule");
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needLogin, setNeedLogin] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const user = await getMe(); // also performs LIFF init + Supabase session exchange
+        const user = await getMe(); // throws "not_logged_in" when there is no Supabase session
         if (!cancelled) setMe(user);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "error");
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "error";
+        if (msg === "not_logged_in") setNeedLogin(true);
+        else setError(msg);
       }
     })();
     return () => {
@@ -39,6 +44,16 @@ export default function AppShell() {
     };
   }, []);
 
+  if (needLogin) {
+    return (
+      <main className="splash">
+        <Mascot pose="hello" size={120} />
+        <Logo size={30} markless />
+        <p className="muted">เข้าสู่ระบบเพื่อดูตารางเวรของคุณ</p>
+        <button className="btn" onClick={startLineLogin}>เข้าสู่ระบบด้วย LINE</button>
+      </main>
+    );
+  }
   if (error) {
     return (
       <main className="splash">

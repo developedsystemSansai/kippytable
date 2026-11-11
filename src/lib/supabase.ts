@@ -1,6 +1,5 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { ensureLiff } from "./liff";
 
 let client: SupabaseClient | null = null;
 
@@ -16,45 +15,46 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
-/** Reads the (unverified) `sub` claim only to compare which LINE account a stored session belongs to. */
-function subOf(idToken: string): string | null {
-  try {
-    const part = idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return (JSON.parse(atob(part)) as { sub?: string }).sub ?? null;
-  } catch {
-    return null;
-  }
+const STATE_KEY = "kippy_line_state";
+
+/** Send the browser to LINE Login (OAuth 2.0 authorization code flow). */
+export function startLineLogin() {
+  const clientId = process.env.NEXT_PUBLIC_LINE_CHANNEL_ID;
+  if (!clientId) throw new Error("NEXT_PUBLIC_LINE_CHANNEL_ID is not set");
+  const state = crypto.randomUUID();
+  sessionStorage.setItem(STATE_KEY, state);
+  const qs = new URLSearchParams({
+    response_type: "code",
+    client_id: clientId,
+    redirect_uri: `${location.origin}/auth/callback`,
+    state,
+    scope: "profile openid",
+  });
+  location.href = `https://access.line.me/oauth2/v2.1/authorize?${qs.toString().replace(/\+/g, "%20")}`;
+}
+
+/** Called on /auth/callback: swap the LINE `code` for a Supabase session via the line-auth Edge Function. */
+export async function finishLineLogin(code: string, state: string | null): Promise<void> {
+  const expected = sessionStorage.getItem(STATE_KEY);
+  sessionStorage.removeItem(STATE_KEY);
+  if (!expected || state !== expected) throw new Error("invalid_state");
+
+  const sb = supabase();
+  const { data: ex, error } = await sb.functions.invoke<{ token_hash?: string }>("line-auth", { body: { code } });
+  if (error || !ex?.token_hash) throw new Error("login_failed");
+  const { data, error: vErr } = await sb.auth.verifyOtp({ token_hash: ex.token_hash, type: "magiclink" });
+  if (vErr || !data.user) throw new Error("login_failed");
 }
 
 let sessionPromise: Promise<string> | null = null;
 
-/** Make sure a Supabase session exists for the current LINE user. Returns the Supabase user id. */
+/** Returns the Supabase user id, or throws "not_logged_in" so the UI can show the login screen. */
 export function ensureSession(): Promise<string> {
   if (!sessionPromise) {
     sessionPromise = (async () => {
-      const liff = await ensureLiff();
-      const sb = supabase();
-      const idToken = liff.getIDToken();
-      if (!idToken) {
-        liff.logout();
-        liff.login({ redirectUri: window.location.href });
-        return new Promise<never>(() => {});
-      }
-
-      const { data } = await sb.auth.getSession();
-      const existing = data.session;
-      if (existing && existing.user.user_metadata?.line_user_id === subOf(idToken)) {
-        return existing.user.id;
-      }
-      if (existing) await sb.auth.signOut(); // different LINE account on this device
-
-      const { data: ex, error } = await sb.functions.invoke<{ token_hash?: string }>("line-auth", {
-        body: { idToken },
-      });
-      if (error || !ex?.token_hash) throw new Error("login_failed");
-      const { data: verified, error: vErr } = await sb.auth.verifyOtp({ token_hash: ex.token_hash, type: "magiclink" });
-      if (vErr || !verified.user) throw new Error("login_failed");
-      return verified.user.id;
+      const { data } = await supabase().auth.getSession();
+      if (!data.session) throw new Error("not_logged_in");
+      return data.session.user.id;
     })();
     sessionPromise.catch(() => {
       sessionPromise = null;

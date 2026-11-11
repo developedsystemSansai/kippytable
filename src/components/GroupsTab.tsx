@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { ensureLiff, track } from "@/lib/liff";
+import { track } from "@/lib/analytics";
+import { shareText } from "@/lib/share";
 import { createGroup, getGroupDay, joinGroup, leaveGroup, listGroups, type GroupDetailData } from "@/lib/data";
 import { addDays, thaiDateLong, todayISO } from "@/lib/dates";
 import type { Group } from "@/lib/types";
@@ -107,11 +108,7 @@ function GroupDetail({ id, onBack }: { id: string; onBack: () => void }) {
   async function invite() {
     if (!data) return;
     const text = `ชวนเข้ากลุ่ม "${data.group.name}" ใน Kippy ใช้รหัสเชิญ ${data.group.invite_code}`;
-    try {
-      const liff = await ensureLiff();
-      if (liff.isApiAvailable("shareTargetPicker")) { await liff.shareTargetPicker([{ type: "text", text }]); return; }
-    } catch {}
-    try { await navigator.clipboard.writeText(text); alert("คัดลอกคำเชิญแล้ว"); } catch {}
+    await shareText(text, "คัดลอกคำเชิญแล้ว");
   }
 
   async function leave() {

@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, Share2 } from "lucide-react";
-import { ensureLiff, track } from "@/lib/liff";
+import { track } from "@/lib/analytics";
+import { shareText } from "@/lib/share";
 import { listShifts } from "@/lib/data";
 import {
   THAI_WEEKDAYS_SHORT, addDays, monthCells, shiftMonth, thaiDateLong, thaiMonthTitle, todayISO,
@@ -73,17 +74,7 @@ export default function ScheduleTab() {
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((s) => `${thaiDateLong(s.date)}: ${s.label}${s.hours ? ` (${s.hours} ชม.)` : ""}`);
     const text = `ตารางเวร ${thaiMonthTitle(ym[0], ym[1])}\n${lines.join("\n") || "ยังไม่ได้ลงเวร"}`;
-    try {
-      const liff = await ensureLiff();
-      if (liff.isApiAvailable("shareTargetPicker")) {
-        await liff.shareTargetPicker([{ type: "text", text }]);
-        return;
-      }
-    } catch {}
-    try {
-      await navigator.clipboard.writeText(text);
-      alert("คัดลอกตารางเวรแล้ว");
-    } catch {}
+    await shareText(text, "คัดลอกตารางเวรแล้ว");
   }
 
   return (

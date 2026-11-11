@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { ensureLiff } from "@/lib/liff";
 import { deleteMyAccount } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import type { Me } from "@/lib/types";
@@ -11,9 +10,7 @@ export default function MeTab({ me }: { me: Me }) {
   const [error, setError] = useState<string | null>(null);
 
   async function logout() {
-    const liff = await ensureLiff();
     await supabase().auth.signOut();
-    liff.logout();
     location.reload();
   }
 
