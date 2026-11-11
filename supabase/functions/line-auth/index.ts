@@ -56,7 +56,10 @@ Deno.serve(async (req) => {
       client_secret: channelSecret,
     }),
   });
-  if (!tokenRes.ok) return json({ error: "code_exchange_failed" }, 401);
+  if (!tokenRes.ok) {
+  console.error("line token error", tokenRes.status, await tokenRes.text());
+  return json({ error: "code_exchange_failed" }, 401);
+}
   const idToken = (await tokenRes.json() as { id_token?: string }).id_token;
   if (!idToken) return json({ error: "no_id_token" }, 401);
 
