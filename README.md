@@ -71,7 +71,7 @@ design/preview.html             พรีวิวหน้าจอแบบ st
    supabase login
    supabase link --project-ref <PROJECT_REF>
    supabase db push                                   # สร้างตาราง + RLS + RPC
-   supabase secrets set LINE_LOGIN_CHANNEL_ID=<Channel ID ของ LINE Login>
+   supabase secrets set LINE_LOGIN_CHANNEL_ID=<Channel ID ของ LINE Login> LINE_LOGIN_CHANNEL_SECRET=<Channel secret> LINE_REDIRECT_URI=https://<โดเมนของคุณ>/auth/callback
    supabase secrets set ALLOWED_ORIGIN=https://<โดเมนของคุณ>
    supabase functions deploy line-auth
    ```

@@ -2,7 +2,7 @@
   "name": "kippy",
   "version": "1.0.0",
   "private": true,
-  "description": "Kippy - LINE LIFF shift scheduling app (Next.js + Supabase)",
+  "description": "Kippy - LINE Login shift scheduling app (Next.js + Supabase)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@line/liff": "^2.22.0",
     "@supabase/supabase-js": "^2.45.0",
     "lucide-react": "^0.468.0",
     "next": "^16.0.0",
