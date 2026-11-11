@@ -11,12 +11,15 @@ import ScheduleTab from "./ScheduleTab";
 import GroupsTab from "./GroupsTab";
 import IncomeTab from "./IncomeTab";
 import MeTab from "./MeTab";
+import FortuneTab from "./FortuneTab";
+import ThemeToggle from "./ThemeToggle";
 
-type TabId = "schedule" | "groups" | "income" | "me";
+type TabId = "schedule" | "groups" | "income" | "fortune" | "me";
 const TABS: { id: TabId; label: string; icon: IconName }[] = [
   { id: "schedule", label: "ตารางเวร", icon: "calendar-clock" },
   { id: "groups", label: "กลุ่ม", icon: "group" },
   { id: "income", label: "รายได้", icon: "wallet" },
+  { id: "fortune", label: "ดวง", icon: "star" },
   { id: "me", label: "ฉัน", icon: "profile" },
 ];
 
@@ -77,13 +80,14 @@ export default function AppShell() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="topbar-inner"><Logo size={22} /></div>
+        <div className="topbar-inner"><Logo size={22} /><ThemeToggle /></div>
       </header>
       <div className="app-content">
         <div key={tab} className="tab-view">
           {tab === "schedule" && <ScheduleTab />}
           {tab === "groups" && <GroupsTab />}
           {tab === "income" && <IncomeTab />}
+          {tab === "fortune" && <FortuneTab />}
           {tab === "me" && <MeTab me={me} />}
         </div>
       </div>

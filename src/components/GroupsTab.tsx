@@ -7,6 +7,7 @@ import { createGroup, getGroupDay, joinGroup, leaveGroup, listGroups, type Group
 import { addDays, thaiDateLong, todayISO } from "@/lib/dates";
 import type { Group } from "@/lib/types";
 import Stamp from "./Stamp";
+import GroupFortune from "./GroupFortune";
 import Mascot from "./Mascot";
 import KIcon from "./KIcon";
 
@@ -142,6 +143,7 @@ function GroupDetail({ id, onBack }: { id: string; onBack: () => void }) {
           ))}
         </div>
       </section>
+      <GroupFortune groupId={id} date={date} />
       <section className="block">
         <button className="btn quiet" onClick={invite} style={{ gap: 8 }}><Mascot pose="love" size={30} />ส่งคำเชิญ</button>
         <button className="btn danger" onClick={leave}>{data?.group.is_owner ? "ลบกลุ่ม" : "ออกจากกลุ่ม"}</button>

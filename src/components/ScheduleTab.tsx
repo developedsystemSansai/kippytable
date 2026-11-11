@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Share2 } from "lucide-react";
+import { ChevronRight, Printer, Share2 } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { shareText } from "@/lib/share";
 import { listShifts } from "@/lib/data";
@@ -105,7 +105,10 @@ export default function ScheduleTab() {
             <h2>{thaiMonthTitle(ym[0], ym[1])}</h2>
             <button className="icon-btn" aria-label="เดือนถัดไป" onClick={() => setYm(shiftMonth(ym[0], ym[1], 1))}><KIcon name="arrow-right" size={34} /></button>
           </div>
-          <button className="icon-btn" aria-label="แชร์ตารางเวร" title="แชร์ตารางเวร" onClick={share}><Share2 size={19} strokeWidth={1.75} /></button>
+          <span style={{ display: "inline-flex" }}>
+            <a className="icon-btn" aria-label="พิมพ์รายงานเดือนนี้" title="พิมพ์รายงานเดือนนี้" href={`/report?month=${monthKey}`} target="_blank" rel="noopener" onClick={() => track("print_report", { kind: "month" })}><Printer size={19} strokeWidth={1.75} /></a>
+            <button className="icon-btn" aria-label="แชร์ตารางเวร" title="แชร์ตารางเวร" onClick={share}><Share2 size={19} strokeWidth={1.75} /></button>
+          </span>
         </div>
 
         <div className="roster-sum">

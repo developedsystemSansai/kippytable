@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Printer } from "lucide-react";
+import { track } from "@/lib/analytics";
 import { getIncome } from "@/lib/data";
 import { THAI_MONTHS, todayISO } from "@/lib/dates";
 import type { IncomeMonth } from "@/lib/types";
@@ -64,6 +66,9 @@ export default function IncomeTab() {
         </div>
       )}
       <p className="muted">คำนวณจากค่าเวรที่กรอกไว้ในแต่ละวัน</p>
+      <a className="btn quiet" href={`/report?year=${year}`} target="_blank" rel="noopener" style={{ gap: 8 }} onClick={() => track("print_report", { kind: "year" })}>
+        <Printer size={18} strokeWidth={1.75} />พิมพ์รายงานรายได้ปี {year + 543}
+      </a>
     </section>
   );
 }
