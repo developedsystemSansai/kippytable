@@ -1,10 +1,13 @@
-// Edge Function: exchange a LINE ID token for a Supabase session.
+// Edge Function: exchange a LINE Login authorization code for a Supabase session.
 //
-// Flow: client (LIFF) -> POST { idToken } -> verify with LINE -> find/create auth user ->
-//       generateLink(magiclink) (no email is sent) -> return { token_hash }
-//       client then calls supabase.auth.verifyOtp({ token_hash, type: "magiclink" }) to get a real session.
+// Flow: browser -> LINE Login (OAuth, redirect back to /auth/callback with ?code)
+//       -> POST { code } here -> swap code for tokens at LINE (needs channel secret)
+//       -> verify id_token -> find/create auth user -> generateLink(magiclink) (no email sent)
+//       -> return { token_hash }; client calls supabase.auth.verifyOtp({ token_hash, type: "magiclink" }).
 //
-// Secrets: LINE_LOGIN_CHANNEL_ID (set with `supabase secrets set`), optional ALLOWED_ORIGIN.
+// Secrets (supabase secrets set ...):
+//   LINE_LOGIN_CHANNEL_ID, LINE_LOGIN_CHANNEL_SECRET, LINE_REDIRECT_URI (e.g. https://kippytable.vercel.app/auth/callback)
+//   optional ALLOWED_ORIGIN.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -28,18 +31,36 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const channelId = Deno.env.get("LINE_LOGIN_CHANNEL_ID");
+  const channelSecret = Deno.env.get("LINE_LOGIN_CHANNEL_SECRET");
+  const redirectUri = Deno.env.get("LINE_REDIRECT_URI");
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!channelId || !url || !serviceKey) return json({ error: "server_misconfigured" }, 500);
+  if (!channelId || !channelSecret || !redirectUri || !url || !serviceKey) return json({ error: "server_misconfigured" }, 500);
 
-  let idToken = "";
+  let code = "";
   try {
     const body = await req.json();
-    idToken = typeof body?.idToken === "string" ? body.idToken : "";
+    code = typeof body?.code === "string" ? body.code : "";
   } catch { /* fallthrough */ }
-  if (!idToken || idToken.length > 4096) return json({ error: "invalid_request" }, 400);
+  if (!code || code.length > 1024) return json({ error: "invalid_request" }, 400);
 
-  // 1) Verify with LINE (checks signature, expiry and that `aud` equals our channel ID).
+  // 1) Swap the one-time code for tokens (redirect_uri comes from our secret, not from the client).
+  const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      client_id: channelId,
+      client_secret: channelSecret,
+    }),
+  });
+  if (!tokenRes.ok) return json({ error: "code_exchange_failed" }, 401);
+  const idToken = (await tokenRes.json() as { id_token?: string }).id_token;
+  if (!idToken) return json({ error: "no_id_token" }, 401);
+
+  // 2) Verify with LINE (checks signature, expiry and that `aud` equals our channel ID).
   const verify = await fetch("https://api.line.me/oauth2/v2.1/verify", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -56,7 +77,7 @@ Deno.serve(async (req) => {
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  // 2) Find or create the Supabase user.
+  // 3) Find or create the Supabase user.
   let { data: profile } = await admin.from("profiles").select("id").eq("line_user_id", lineUserId).maybeSingle();
 
   if (!profile) {
@@ -82,7 +103,7 @@ Deno.serve(async (req) => {
     await admin.from("profiles").update({ name, picture, updated_at: new Date().toISOString() }).eq("id", profile.id);
   }
 
-  // 3) One-time token the client exchanges for a session. No email is sent by generateLink.
+  // 4) One-time token the client exchanges for a session. No email is sent by generateLink.
   const link = await admin.auth.admin.generateLink({ type: "magiclink", email });
   const tokenHash = link.data?.properties?.hashed_token;
   if (link.error || !tokenHash) return json({ error: "link_failed" }, 500);
