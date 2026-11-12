@@ -16,9 +16,9 @@ export default function CallbackPage() {
     finishLineLogin(code, p.get("state"))
       .then(() => {
         // Return to the tab the rich menu button pointed at, if any.
-        const next = sessionStorage.getItem("kippy_next");
+        const stored = sessionStorage.getItem("kippy_next");
+        const next = stored && ["schedule", "groups", "income", "fortune", "me"].includes(stored) ? stored : null;
         sessionStorage.removeItem("kippy_next");
-        sessionStorage.removeItem("kippy_autologin");
         location.replace(next ? `/?tab=${encodeURIComponent(next)}` : "/");
       })
       .catch((e) => setError(e instanceof Error ? e.message : "error"));
