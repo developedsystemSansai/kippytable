@@ -1,5 +1,5 @@
 -- Kippy v2: admin role, preset pay rates (MOPH), contact-admin messages, horoscope profile.
--- Run once in Supabase SQL Editor of the REAL project (ymqsx...). Safe to re-run.
+-- Applied to the production project; statements are idempotent where possible.
 -- Writes go through SECURITY DEFINER RPCs; every table keeps RLS on.
 
 begin;
@@ -212,12 +212,7 @@ grant execute on function public.is_admin(), public.set_my_position(text),
 
 commit;
 
------------------------------------------------------------------- ตั้งแอดมิน (รันหลังข้างบนสำเร็จ)
--- รหัสที่ให้มาเป็นได้ทั้ง id ผู้ใช้ (uuid ไม่มีขีด) หรือ LINE userId — เช็กทั้งสองแบบ
-update public.profiles
-   set is_admin = true
- where replace(id::text, '-', '') = 'd935c22e7b4e37664d4a04943bb6934d'
-    or line_user_id in ('d935c22e7b4e37664d4a04943bb6934d', 'Ud935c22e7b4e37664d4a04943bb6934d');
-
--- ตรวจผล: ต้องมี 1 แถวและ is_admin = true (ถ้าไม่มี ให้ดู id จริงด้วย: select id, line_user_id, name from public.profiles;)
-select id, line_user_id, name, is_admin from public.profiles where is_admin;
+------------------------------------------------------------------ ตั้งแอดมิน
+-- ไม่เก็บ ID ของแอดมินไว้ใน repo. ตั้งแอดมินด้วยมือใน SQL Editor (แทนค่า <LINE_USER_ID>):
+--   update public.profiles set is_admin = true where line_user_id = '<LINE_USER_ID>';
+--   select id, name, is_admin from public.profiles where is_admin;   -- ต้องได้ 1 แถว
