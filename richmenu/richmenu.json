@@ -1,0 +1,11 @@
+{
+  "size": { "width": 2500, "height": 843 },
+  "selected": true,
+  "name": "Kippy main v1",
+  "chatBarText": "เมนู Kippy",
+  "areas": [
+    { "bounds": { "x": 0,    "y": 0, "width": 833, "height": 843 }, "action": { "type": "uri", "label": "ตารางเวร", "uri": "https://kippytable.vercel.app/?tab=schedule" } },
+    { "bounds": { "x": 833,  "y": 0, "width": 834, "height": 843 }, "action": { "type": "uri", "label": "รายได้รวม", "uri": "https://kippytable.vercel.app/?tab=income" } },
+    { "bounds": { "x": 1667, "y": 0, "width": 833, "height": 843 }, "action": { "type": "uri", "label": "คำทำนาย", "uri": "https://kippytable.vercel.app/?tab=fortune" } }
+  ]
+}
