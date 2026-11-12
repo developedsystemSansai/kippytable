@@ -1,27 +1,30 @@
 # Kippy
 
-ตารางเวรบน LINE LIFF: ปฏิทินรายเดือนแบบตารางเวรกระดาษ ตราประทับรหัสเวร (ช/บ/ด), สรุปเวรวันนี้/พรุ่งนี้, ลงเวรหลายวัน, กลุ่มเพื่อนร่วมเวร, สรุปรายได้รายปี
-
-> **สถานะ:** ยังไม่ได้ติดตั้ง/build/deploy จริง ให้รัน `npm install`, `npm run typecheck`, `npm run build`
-> และทดสอบตามเช็กลิสต์ท้ายไฟล์ก่อนเปิดให้ผู้ใช้จริง
+ตารางเวรบนมือถือ เปิดผ่าน LINE: ปฏิทินรายเดือนแบบตารางเวรกระดาษ ตราประทับรหัสเวร (ช/บ/ด/OT), สรุปเวรวันนี้/พรุ่งนี้, ลงเวรหลายวัน, กลุ่มเพื่อนร่วมเวร, สรุปรายได้รายปี/รายเดือน (พิมพ์ได้), อัตราค่าเวรตามตำแหน่ง, ติดต่อแอดมิน และแท็บ "ดวง" (ดูดวง/ไพ่ทาโรต์/ดวงกลุ่ม)
 
 ## สถาปัตยกรรม
 
 ```
-LINE app ──> LIFF (โดเมนของคุณบน Vercel)
-                │   Frontend: Next.js บน Vercel  (GitHub push → Vercel auto-deploy)
-                │ 1) liff.getIDToken()
+LINE (ริชเมนู / ลิงก์) ──> เว็บแอป Next.js บน Vercel  (GitHub push → Vercel auto-deploy)
+                │ 1) startLineLogin(): ส่งไป LINE Login (OAuth 2.0 authorization code, scope profile openid)
+                │    LINE redirect กลับ /auth/callback?code=...
                 ▼
-   Supabase Edge Function  line-auth  ── ตรวจ ID token กับ LINE ── สร้าง/หา user ── คืน token_hash
+   Supabase Edge Function  line-auth ── แลก code เป็น id_token กับ LINE ── ตรวจ id_token ── หา/สร้าง user ── คืน token_hash
                 │ 2) supabase.auth.verifyOtp(token_hash) → ได้ session จริงของ Supabase
                 ▼
    supabase-js ──> Postgres (ตาราง + RLS + RPC)   ← ทุกคำขอผูกกับ auth.uid()
 ```
 
+- **ไม่ใช้ LIFF** เป็นการล็อกอินด้วย LINE Login แบบ redirect (ใช้ได้ทั้งในเบราว์เซอร์ LINE และเบราว์เซอร์ทั่วไป)
 - ไม่มี API server ของตัวเอง: หน้าบ้านคุยกับ Supabase ตรง ความปลอดภัยอยู่ที่ Row Level Security และฟังก์ชัน RPC
 - เวรเป็นของเจ้าของคนเดียว (policy `user_id = auth.uid()`)
-- กลุ่ม/สมาชิกเขียนผ่าน RPC เท่านั้น และ `group_day` ส่งเฉพาะชื่อเวร/สี/ชั่วโมง **ไม่ส่งค่าเวร**
+- กลุ่ม/สมาชิก/ข้อความ/แอดมิน เขียนผ่าน RPC เท่านั้น `group_day` ส่งเฉพาะชื่อเวร/สี/ชั่วโมง **ไม่ส่งค่าเวร** และ `group_horoscopes` ส่งเฉพาะวันเกิดของคนที่ยินยอมแชร์ (ไม่ส่งเวลาเกิด)
+- สิทธิ์แอดมิน = `profiles.is_admin` (แก้ผ่าน RPC ไม่ได้ ต้องตั้งใน SQL Editor)
 - `service_role` key ใช้เฉพาะใน Edge Function (Supabase ใส่ให้เอง) ห้ามใส่ใน Vercel หรือ repo
+- ตอนสร้าง auth user ใหม่ trigger `on_auth_user_created` จะสร้างแถว `profiles` ในธุรกรรมเดียวกัน (กัน user กำพร้า)
+
+## ลิงก์ริชเมนู
+ปุ่มริชเมนูเปิด `/?tab=schedule|income|fortune` (ค่าที่ใช้ได้: `schedule` `groups` `income` `fortune` `me`) ถ้ายังไม่ล็อกอิน แอปจะจำแท็บไว้และพากลับมาหน้านั้นหลังล็อกอินเสร็จ รายละเอียดอยู่ใน `richmenu/README.md`
 
 ## งานภาพ (มาสคอตและไอคอน Kippy)
 ไฟล์พื้นหลังโปร่งใสอยู่ใน `public/kippy/`
@@ -50,48 +53,48 @@ LINE app ──> LIFF (โดเมนของคุณบน Vercel)
 
 ## โครงสร้าง repo
 ```
-src/                            Next.js (frontend)
-supabase/migrations/            SQL: ตาราง, RLS, RPC
-supabase/functions/line-auth/   Edge Function ล็อกอินด้วย LINE
-.github/workflows/ci.yml        typecheck + build ทุก PR
-.github/workflows/supabase.yml  push migration + deploy function เมื่อ supabase/** เปลี่ยนบน main
-design/preview.html             พรีวิวหน้าจอแบบ static (เปิดในเบราว์เซอร์ได้เลย)
+src/                              Next.js (frontend)
+supabase/migrations/              SQL: ตาราง, RLS, RPC, ฟีเจอร์ v2, hardening
+supabase/functions/line-auth/     Edge Function ล็อกอินด้วย LINE
+.github/workflows/ci.yml          typecheck + build ทุก PR / push main
+.github/workflows/supabase.yml    deploy Edge Function เมื่อ supabase/functions/** เปลี่ยนบน main
+richmenu/                         รูป + สคริปต์สร้างริชเมนู LINE
+design/preview.html               พรีวิวหน้าจอแบบ static (เปิดในเบราว์เซอร์ได้เลย)
 ```
+
+## ตัวแปรสภาพแวดล้อม (Vercel: Production + Preview / ในเครื่อง: `.env.local`)
+ดูตัวอย่างใน `.env.example`
+
+| ชื่อ | ค่า |
+|---|---|
+| `NEXT_PUBLIC_KIPPY_SUPABASE_URL` | Project URL ของ Supabase |
+| `NEXT_PUBLIC_KIPPY_SUPABASE_ANON_KEY` | anon/publishable key (ไม่ใช่ service_role) |
+| `NEXT_PUBLIC_LINE_CHANNEL_ID` | Channel ID ของ LINE Login |
+| `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | ไม่บังคับ (Umami analytics) |
 
 ## ตั้งค่าครั้งแรก
 
-### 1) GitHub
-สร้าง repo (private ได้) แล้ว push โปรเจกต์ขึ้น `main`
-
-### 2) Supabase
-1. สร้างโปรเจกต์ที่ supabase.com (region ใกล้ไทย เช่น Singapore)
-2. ติดตั้ง CLI แล้ว link:
+### 1) Supabase
+1. สร้างโปรเจกต์ (region ใกล้ไทย เช่น Singapore)
+2. รัน SQL ใน `supabase/migrations/` ตามลำดับชื่อไฟล์ (SQL Editor หรือ `supabase link` + `supabase db push`) — โปรเจกต์ production บันทึกประวัติ migration ไว้แล้ว `db push` จะรันเฉพาะไฟล์ใหม่
+3. ตั้งแอดมิน: ดูคำสั่งท้ายไฟล์ `20261111000000_features.sql`
+4. Secrets ของ Edge Function:
    ```bash
-   npm i -g supabase
-   supabase login
-   supabase link --project-ref <PROJECT_REF>
-   supabase db push                                   # สร้างตาราง + RLS + RPC
-   supabase secrets set LINE_LOGIN_CHANNEL_ID=<Channel ID ของ LINE Login> LINE_LOGIN_CHANNEL_SECRET=<Channel secret> LINE_REDIRECT_URI=https://<โดเมนของคุณ>/auth/callback
-   supabase secrets set ALLOWED_ORIGIN=https://<โดเมนของคุณ>
-   supabase functions deploy line-auth
+   supabase secrets set LINE_LOGIN_CHANNEL_ID=<Channel ID> LINE_LOGIN_CHANNEL_SECRET=<Channel secret> \
+     LINE_REDIRECT_URI=https://<โดเมน>/auth/callback ALLOWED_ORIGIN=https://<โดเมน>
+   supabase functions deploy line-auth --no-verify-jwt
    ```
-3. Authentication → Providers → Email: ปิด "Enable sign ups" (ผู้ใช้ถูกสร้างโดย Edge Function ผ่าน admin API)
-   แล้วทดสอบล็อกอินว่ายังใช้ได้ (ยังไม่ได้ทดสอบจริง)
-4. Settings → API: คัดลอก Project URL และ **anon/publishable key** (ไม่ใช่ service_role)
+5. Authentication → Providers → Email: ปิด "Enable sign ups" (ผู้ใช้ถูกสร้างโดย Edge Function ผ่าน admin API)
 
-### 3) LINE Developers Console
-1. LINE Login channel → เปิด scope `openid` และ `profile`
-2. LIFF app → Endpoint URL = โดเมนที่ Vercel ให้ (หรือโดเมนของคุณ), Scope = `openid profile`
-3. คัดลอก LIFF ID
+### 2) LINE Developers Console
+LINE Login channel → เปิด scope `openid` `profile` และเพิ่ม Callback URL = `https://<โดเมน>/auth/callback`
 
-### 4) Vercel
-1. Add New Project → Import repo จาก GitHub (Framework: Next.js)
-2. Environment Variables (Production + Preview): `NEXT_PUBLIC_LIFF_ID`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. ทุกครั้งที่ push เข้า `main` Vercel deploy production เอง และทุก PR ได้ Preview URL
+### 3) Vercel
+Import repo จาก GitHub (Framework: Next.js) ตั้งตัวแปรตามตารางด้านบน ทุก push เข้า `main` deploy production เอง และทุก PR ได้ Preview URL
 
-### 5) GitHub Actions (ไม่บังคับแต่แนะนำ)
-Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`
-การแก้ `supabase/**` บน `main` จะ push migration และ deploy function ให้อัตโนมัติ
+### 4) GitHub Actions
+- `ci.yml` ไม่ต้องตั้งค่า
+- `supabase.yml` ต้องมี Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID` (project ref)
 
 ## พัฒนาบนเครื่อง
 ```bash
@@ -100,21 +103,23 @@ npm install
 npm run typecheck
 npm run dev
 ```
-ตอนพัฒนาให้สร้าง LIFF app แยกที่ Endpoint เป็น `http://localhost:3000`
+เพิ่ม `http://localhost:3000/auth/callback` เป็น Callback URL ของ LINE Login ถ้าจะทดสอบล็อกอินในเครื่อง (และตั้ง `LINE_REDIRECT_URI` ให้ตรงกัน)
 
 ## เช็กลิสต์ทดสอบก่อนใช้จริง
-1. เปิดแอปใน LINE → ล็อกอินสำเร็จ เห็นปฏิทินว่าง
-2. ลงเวร แก้ ลบ เลือกหลายวัน เปลี่ยนเดือน
-3. สร้างกลุ่ม → ใช้ LINE อีกบัญชีเข้าร่วมด้วยรหัส → เห็นเวรกันรายวัน แต่ไม่เห็นค่าเวร
-4. ใช้ anon key เรียก `rest/v1/shifts` โดยไม่ล็อกอิน ต้องได้ข้อมูลว่างหรือถูกปฏิเสธ
-5. ล็อกอินบัญชี A แล้วลองอ่านเวรของบัญชี B ผ่าน supabase-js ต้องไม่เห็น
-6. "ลบข้อมูลทั้งหมดของฉัน" แล้วตรวจว่าแถวใน `profiles`/`shifts` หายและ auth user ถูกลบ
+1. เปิดแอปจาก LINE → ล็อกอินสำเร็จ เห็นปฏิทินว่าง
+2. กดปุ่มริชเมนู "รายได้รวม" / "คำทำนาย" ตอนยังไม่ล็อกอิน → หลังล็อกอินต้องเปิดแท็บนั้น
+3. ลงเวร แก้ ลบ เลือกหลายวัน เปลี่ยนเดือน
+4. สร้างกลุ่ม → ใช้ LINE อีกบัญชีเข้าร่วมด้วยรหัส → เห็นเวรกันรายวัน แต่ไม่เห็นค่าเวร
+5. ใช้ anon key เรียก `rest/v1/shifts` โดยไม่ล็อกอิน ต้องได้ข้อมูลว่างหรือถูกปฏิเสธ
+6. ล็อกอินบัญชี A แล้วลองอ่านเวรของบัญชี B ผ่าน supabase-js ต้องไม่เห็น
+7. บัญชีที่ไม่ใช่แอดมินเรียก `admin_save_rate` ต้องได้ `forbidden`
+8. "ลบข้อมูลทั้งหมดของฉัน" แล้วตรวจว่าแถวใน `profiles`/`shifts` หายและ auth user ถูกลบ
 
 ## ที่ยังไม่มี
 - แชร์เป็นรูป (ตอนนี้แชร์เป็นข้อความผ่าน LINE)
 - จัดเวรทดลอง/แนะนำเวรอัตโนมัติ
 - Rate limit ที่ `line-auth` (แนะนำใส่ที่ Cloudflare)
-
+- อัตราค่าเวรเริ่มต้นอ้างอิงเกณฑ์ ก.สธ. แอดมินต้องตรวจ/แก้ให้ตรงกับประกาศของหน่วยงานในแอป
 
 ## แอนิเมชัน
 มาสคอตมี pop-in แล้ววนท่าทางตามท่า (`data-pose`), ตราประทับเด้งเข้าปฏิทินทีละช่อง, เนื้อหาแท็บ/sheet/toast มีการเลื่อนเข้า-ออก, ปุ่มมี press feedback ทั้งหมดอยู่ท้าย `globals.css` และปิดอัตโนมัติเมื่อผู้ใช้ตั้ง “ลดการเคลื่อนไหว” (`prefers-reduced-motion`)
