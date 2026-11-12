@@ -6,7 +6,7 @@ let client: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
   if (!client) {
     const url = process.env.NEXT_PUBLIC_KIPPY_SUPABASE_URL;
-   const key = process.env.NEXT_PUBLIC_KIPPY_SUPABASE_ANON_KEY;
+    const key = process.env.NEXT_PUBLIC_KIPPY_SUPABASE_ANON_KEY;
     if (!url || !key) throw new Error("Supabase env is not set");
     client = createClient(url, key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
@@ -16,6 +16,8 @@ export function supabase(): SupabaseClient {
 }
 
 const STATE_KEY = "kippy_line_state";
+const NEXT_KEY = "kippy_next";
+const TAB_IDS = ["schedule", "groups", "income", "fortune", "me"];
 
 /** Send the browser to LINE Login (OAuth 2.0 authorization code flow). */
 export function startLineLogin() {
@@ -23,6 +25,10 @@ export function startLineLogin() {
   if (!clientId) throw new Error("NEXT_PUBLIC_LINE_CHANNEL_ID is not set");
   const state = crypto.randomUUID();
   sessionStorage.setItem(STATE_KEY, state);
+  // Remember which tab (e.g. from a rich-menu link) to open after login.
+  const tab = new URLSearchParams(location.search).get("tab");
+  if (tab && TAB_IDS.includes(tab)) sessionStorage.setItem(NEXT_KEY, tab);
+  else sessionStorage.removeItem(NEXT_KEY);
   const qs = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
