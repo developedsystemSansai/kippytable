@@ -29,6 +29,8 @@ export type Reading = {
   northern: string;
   yam: string | null;
   shiftTip: string | null;
+  westernEx: string;               // everyday example of the western aspect
+  northernEx: string;              // everyday example of the Lanna relation
   sunEl: Element;                  // element of the natal sun sign
   branch: Branch;                  // relation between birth-year animal and today's day animal
 };
@@ -108,6 +110,31 @@ const NORTHERN_REL: Record<Branch, string> = {
   neutral: "นักษัตรวันนี้ไม่ได้เด่นเรื่องดีหรือร้ายกับปีเกิด ใช้วิจารณญาณของตัวเองได้เต็มที่",
 };
 
+const WESTERN_EX: Record<Aspect, string> = {
+  trine: "เช่น พูดอะไรคนก็เข้าใจง่าย ขอความช่วยเหลือแล้วมีคนยินดีช่วยโดยไม่ต้องอธิบายนาน",
+  sextile: "เช่น มีคนทักมาชวนทำเรื่องเล็กๆ ที่ต่อยอดได้ ถ้าตอบรับไว้ก็จะได้อะไรเพิ่ม",
+  conjunct: "เช่น ดีใจหรือน้อยใจง่ายกว่าปกติ ก่อนตอบข้อความที่กระทบใจให้นับหนึ่งถึงสิบก่อน",
+  minor: "เช่น วันนี้เป็นไปตามที่วางแผนเอง ไม่มีแรงดึงจากภายนอกเป็นพิเศษ ตัดสินใจตามจังหวะตัวเองได้",
+  square: "เช่น เจอคำพูดไม่ถูกใจแล้วหงุดหงิดเร็ว ลองพักหายใจลึกๆ ก่อนตอบ",
+  opposite: "เช่น คุยกับเพื่อนหรือเพื่อนร่วมงานแล้วเห็นต่างกัน ลองฟังจนจบแล้วค่อยบอกความเห็น",
+};
+const NORTHERN_EX: Record<Branch, string> = {
+  harmony: "เช่น ขอสลับเวรหรือขอให้ใครช่วยงาน จะได้รับคำตอบที่ดีกว่าวันอื่น",
+  trine: "เช่น ทีมช่วยกันแบ่งงานได้ลงตัว ทำเสร็จเร็วกว่าที่คิด",
+  same: "เช่น ใจนิ่งและตั้งใจ แต่ไม่ยอมเปลี่ยนวิธีทำงานแม้มีคนแนะนำ ลองฟังสักข้อ",
+  clash: "เช่น รีบจนลืมของ หรือเกือบขับรถผิดทาง จึงควรเผื่อเวลาเดินทางและตรวจของสองรอบ",
+  harm: "เช่น พูดเล่นแล้วอีกฝ่ายเข้าใจผิด ควรใช้น้ำเสียงอ่อนลงอีกนิด",
+  neutral: "เช่น เป็นวันธรรมดาที่ไม่มีอะไรเด่น ตัดสินใจตามเหตุผลของตัวเองได้เลย",
+};
+
+/** What the overall % feels like in a real day (shown under the score). */
+export function scoreExample(overall: number): string {
+  return overall >= 85 ? "เช่น เริ่มเวรแล้วทุกอย่างลื่น คนรอบข้างใจดี เรื่องที่รอไว้ได้คำตอบดี"
+    : overall >= 70 ? "เช่น มีเรื่องเล็กๆ ที่ไปได้ดี ได้คำชม หรืองานเสร็จเร็วกว่าที่คาด"
+    : overall >= 50 ? "เช่น วันปกติ งานเดินตามแผน มีสะดุดนิดหน่อยแต่แก้ได้ในไม่กี่นาที"
+    : "เช่น รู้สึกเหนื่อยหรืออารมณ์ไวกว่าปกติ เรื่องเล็กอาจทำให้หงุดหงิด ผ่อนจังหวะและพักให้พอ";
+}
+
 const SHIFT_TIPS: Record<string, string[]> = {
   เช้า: ["เวรเช้า: เตรียมของไว้ตั้งแต่คืนก่อน แล้วจะเริ่มวันได้ลื่นขึ้น", "เวรเช้า: กินมื้อเช้าให้พอ น้ำตาลไม่ตกกลางเวร"],
   บ่าย: ["เวรบ่าย: งีบสั้นๆ ก่อนเข้าเวร ช่วงเย็นจะเหนื่อยน้อยลง", "เวรบ่าย: จัดลำดับงานตั้งแต่ต้นเวร ช่วงปลายเวรจะไม่ลน"],
@@ -170,6 +197,8 @@ export function dailyReading(p: Person, date: string, todayShift?: string | null
     lannaYear: `ปี${y.lanna} (${y.th})`,
     lannaDay: `วัน${d.lanna} (${d.th})`,
     northern: NORTHERN_REL[rel],
+    westernEx: WESTERN_EX[asp],
+    northernEx: NORTHERN_EX[rel],
     yam: p.birth_time ? YAM_NAMES[yamOf(p.birth_time)] : null,
     shiftTip: tips ? pick(tips, `${seed}|t`) : null,
     sunEl,

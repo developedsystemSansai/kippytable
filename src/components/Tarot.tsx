@@ -4,7 +4,7 @@ import { track } from "@/lib/analytics";
 import { todayISO } from "@/lib/dates";
 import type { Person } from "@/lib/fortune";
 import { shareText } from "@/lib/share";
-import { META, SPREAD_LABELS, TAROT, cardSrc, dailyDraw, drawSpread, spreadSummary, type Draw } from "@/lib/tarot";
+import { META, SPREAD_LABELS, TAROT, cardSrc, dailyDraw, drawSpread, exampleOf, spreadStory, spreadSummary, type Draw } from "@/lib/tarot";
 import { SparkleBurst, Starfield } from "./Cosmos";
 
 type Mode = "daily" | "three";
@@ -101,6 +101,7 @@ function Reading({ d, label, i }: { d: Draw; label?: string; i: number }) {
           {m.kw.map((k) => <span key={k} className="chip chip-kw">{k}</span>)}
         </div>
         <p>{d.reversed ? c.rev : c.up}</p>
+        <div className="ex"><span className="ex-tag">ตัวอย่าง</span><p>{exampleOf(d)}</p></div>
       </div>
     </article>
   );
@@ -197,6 +198,11 @@ export default function Tarot({ person }: { person: Person }) {
               </svg>
               <strong>ภาพรวม</strong>
               <p>{spreadSummary(cards)}</p>
+              <div className="ex ex-story">
+                <span className="ex-tag">ภาพตัวอย่างทั้ง 3 ใบ</span>
+                <ol>{spreadStory(cards).map((t) => <li key={t}>{t}</li>)}</ol>
+                <small>ลองนึกว่าสามเรื่องนี้เป็นเรื่องเดียวกันที่ไล่ต่อกัน ตั้งแต่ตอนนี้ ไปจนถึงสิ่งที่ควรทำ</small>
+              </div>
             </div>
           )}
           {allOpen && <button className="btn quiet" onClick={share}>แชร์ผลไพ่</button>}

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { track } from "@/lib/analytics";
 import { deleteHoroProfile, getHoroProfile, listShifts, saveHoroProfile } from "@/lib/data";
 import { addDays, isValidISO, thaiDateLong, todayISO } from "@/lib/dates";
-import { CATS, compatibility, dailyReading, type Compat, type Person, type Reading } from "@/lib/fortune";
+import { CATS, compatibility, dailyReading, scoreExample, type Compat, type Person, type Reading } from "@/lib/fortune";
 import { shareText } from "@/lib/share";
 import type { HoroProfile } from "@/lib/types";
 import { remedies } from "@/lib/remedies";
@@ -249,12 +249,18 @@ export default function FortuneTab() {
         <p className="muted">{thaiDateLong(date)}{streak > 1 ? ` · เปิดดูต่อเนื่อง ${streak} วัน` : ""}</p>
 
         <FortuneHero key={date} r={r} person={person} date={date} />
+        <div className="bubble rise" style={{ "--i": 0 } as CSSProperties}>
+          <strong>ดวงรวม {r.overall}% แปลว่าอะไร</strong>
+          <small>คิดจากค่าเฉลี่ยดาวทั้ง 4 หมวดด้านล่าง ยิ่งสูงยิ่งเป็นวันที่ลื่นไหล ไม่ใช่การทำนายแบบแน่นอน</small>
+          <div className="ex"><span className="ex-tag">ตัวอย่างวันแบบนี้</span><p>{scoreExample(r.overall)}</p></div>
+        </div>
 
         <div>
           {CATS.map((c) => (
             <div key={c.key} className="cat-row rise" style={{ "--i": CATS.indexOf(c) } as CSSProperties}>
               <div className="cat-head"><span>{c.th}</span><Stars n={r.stars[c.key]} /></div>
               <p>{r.lines[c.key]}</p>
+              <div className="ex"><span className="ex-tag">ตัวอย่าง</span><p>{rem.topics.find((t) => t.cat === c.key)?.example}</p></div>
             </div>
           ))}
         </div>
@@ -284,14 +290,13 @@ export default function FortuneTab() {
         {rem.topics.map((t, i) => (
           <details key={t.cat} className="remedy" open={i === 0}>
             <summary><span>{t.th}</span><Stars n={t.stars} /></summary>
-            <p><b>ตัวอย่างที่อาจเกิดขึ้น:</b> {t.example}</p>
             <p><b>ควรทำ:</b> {t.todo}</p>
             <p><b>ควรเลี่ยง:</b> {t.avoid}</p>
             <p><b>อุปกรณ์พาดวงดี:</b> {t.item}</p>
           </details>
         ))}
         <div className="bubble reply"><small>เคล็ดตามนักษัตรปีเกิด (ล้านนา)</small><p>{rem.northern}</p></div>
-        <p className="disclaimer">เคล็ดเป็นแนวทางเสริมกำลังใจและเตือนสติเท่านั้น ไม่รับประกันผล ตัวอย่างที่อาจเกิดขึ้นเป็นเพียงภาพประกอบ ไม่ใช่การทำนายที่แน่นอน</p>
+        <p className="disclaimer">เคล็ดเป็นแนวทางเสริมกำลังใจและเตือนสติเท่านั้น ไม่รับประกันผล ตัวอย่างในหน้านี้เป็นเพียงภาพประกอบ ไม่ใช่การทำนายที่แน่นอน</p>
       </section>
 
       <section className="block">
@@ -300,11 +305,13 @@ export default function FortuneTab() {
           <strong>แบบสากล</strong>
           <small>ราศีเกิด {r.sunSign} · จันทร์จรวันนี้ {r.moonSignToday} ({r.phaseName})</small>
           <p>{r.western}</p>
+          <div className="ex"><span className="ex-tag">ตัวอย่าง</span><p>{r.westernEx}</p></div>
         </div>
         <div className="bubble">
           <strong>แบบล้านนา (ภาคเหนือ)</strong>
           <small>ปีเกิด {r.lannaYear} · วันนี้เป็น{r.lannaDay}{r.yam ? ` · เกิด${r.yam}` : ""}</small>
           <p>{r.northern}</p>
+          <div className="ex"><span className="ex-tag">ตัวอย่าง</span><p>{r.northernEx}</p></div>
         </div>
         <p className="disclaimer">
           เพื่อความบันเทิงและเป็นกำลังใจเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การเงิน หรือการตัดสินใจสำคัญ ราศีคำนวณจากตำแหน่งดาวจริง
