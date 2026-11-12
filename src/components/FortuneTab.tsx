@@ -6,10 +6,14 @@ import { addDays, isValidISO, thaiDateLong, todayISO } from "@/lib/dates";
 import { CATS, compatibility, dailyReading, type Compat, type Person, type Reading } from "@/lib/fortune";
 import { shareText } from "@/lib/share";
 import type { HoroProfile } from "@/lib/types";
+import { remedies } from "@/lib/remedies";
+import FortuneLoader, { preloadFortuneArt } from "./FortuneLoader";
 import KIcon from "./KIcon";
 import Mascot from "./Mascot";
+import Tarot from "./Tarot";
 
 const STREAK_KEY = "kippy_fortune_streak";
+const SEEN_KEY = "kippy_fortune_seen";
 
 function Stars({ n }: { n: number }) {
   return <span className="stars" aria-label={`${n} จาก 5 ดาว`}>{"★".repeat(n)}<i>{"★".repeat(5 - n)}</i></span>;
@@ -104,8 +108,15 @@ export default function FortuneTab() {
   const [shiftLabel, setShiftLabel] = useState<string | null>(null);
   const [streak, setStreak] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"reading" | "tarot">("reading");
+  // dates whose reveal animation already played in this browser session
+  const [seen, setSeen] = useState<string[]>(() => {
+    try { return JSON.parse(sessionStorage.getItem(SEEN_KEY) ?? "[]") as string[]; } catch { return []; }
+  });
 
   const date = day === "today" ? today : addDays(today, 1);
+
+  useEffect(() => { preloadFortuneArt(); }, []);
 
   useEffect(() => {
     getHoroProfile().then(setProfile).catch((e) => { setError(e instanceof Error ? e.message : "error"); setProfile(null); });
@@ -130,7 +141,8 @@ export default function FortuneTab() {
         {!profile && (
           <section className="block">
             <div className="empty" style={{ marginTop: 0 }}>
-              <Mascot pose="think" size={72} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/kippy/fortune/hero.webp" alt="" width={140} height={112} />
               <p><strong>ดูดวงประจำวันของคุณ</strong><span>ใส่วันเกิดครั้งเดียว แล้วดูดวงรายวันและเทียบดวงกับเพื่อนในกลุ่มได้</span></p>
             </div>
             {error && <p className="error" role="alert">{error}</p>}
@@ -142,11 +154,35 @@ export default function FortuneTab() {
   }
 
   const person: Person = { birth_date: profile.birth_date, birth_time: profile.birth_time };
+
+  const viewSwitch = (
+    <section className="block" style={{ paddingBottom: 0 }}>
+      <div className="seg" role="group" aria-label="เลือกหมวด">
+        <button aria-pressed={view === "reading"} onClick={() => setView("reading")}>ดวงรายวัน</button>
+        <button aria-pressed={view === "tarot"} onClick={() => setView("tarot")}>ไพ่ทาโร่</button>
+      </div>
+    </section>
+  );
+  if (view === "tarot") return <>{viewSwitch}<Tarot person={person} /></>;
+
+  if (!seen.includes(date)) {
+    return (
+      <FortuneLoader onDone={() => setSeen((s) => {
+        const n = [...s, date];
+        try { sessionStorage.setItem(SEEN_KEY, JSON.stringify(n)); } catch {}
+        return n;
+      })} />
+    );
+  }
+
   const r: Reading = dailyReading(person, date, shiftLabel);
   const shareMsg = `ดวง${day === "today" ? "วันนี้" : "พรุ่งนี้"} ${r.overall}% · ${r.headline}\nสีมงคล ${r.luckyColor.name} · เลขนำโชค ${r.luckyNumber}\nจาก Kippy`;
 
+  const rem = remedies(r);
+
   return (
     <>
+      {viewSwitch}
       <section className="block">
         <div className="seg" role="group" aria-label="เลือกวัน">
           <button aria-pressed={day === "today"} onClick={() => setDay("today")}>วันนี้</button>
@@ -182,6 +218,34 @@ export default function FortuneTab() {
         <button className="btn quiet" style={{ gap: 8 }} onClick={() => { shareText(shareMsg, "คัดลอกดวงแล้ว"); track("share_fortune"); }}>
           <Mascot pose="love" size={28} />แชร์ดวงวันนี้
         </button>
+      </section>
+
+      <section className="block">
+        <h2 className="heading-icon"><KIcon name="star" size={24} />เคล็ดเสริมดวง</h2>
+        <div className="rem-colors">
+          <div>
+            <small className="muted">สีเสริมดวง</small>
+            <div className="chips">{rem.good.map((c) => <span key={c.name} className="chip"><span className="dot" style={{ background: c.hex }} />{c.name}</span>)}</div>
+          </div>
+          <div>
+            <small className="muted">สีที่ควรลดการใช้</small>
+            <div className="chips"><span className="chip"><span className="dot" style={{ background: rem.avoidColor.hex }} />{rem.avoidColor.name}</span></div>
+          </div>
+        </div>
+        <p className="hint">สีเสริมดวงคือสีประจำวันนี้กับสีตามธาตุของราศีเกิด ส่วนสีที่ควรลดคือสีของธาตุที่ขัดกัน ไม่ได้แปลว่าห้ามใช้ แค่ให้เลือกสีอื่นเป็นหลักในวันนี้</p>
+        <div className="bubble"><small>ของพกติดตัววันนี้</small><p>{rem.carry}</p></div>
+        <p className="muted">แยกตามเรื่อง (เรียงจากเรื่องที่ควรใส่ใจที่สุด)</p>
+        {rem.topics.map((t, i) => (
+          <details key={t.cat} className="remedy" open={i === 0}>
+            <summary><span>{t.th}</span><Stars n={t.stars} /></summary>
+            <p><b>ตัวอย่างที่อาจเกิดขึ้น:</b> {t.example}</p>
+            <p><b>ควรทำ:</b> {t.todo}</p>
+            <p><b>ควรเลี่ยง:</b> {t.avoid}</p>
+            <p><b>อุปกรณ์พาดวงดี:</b> {t.item}</p>
+          </details>
+        ))}
+        <div className="bubble reply"><small>เคล็ดตามนักษัตรปีเกิด (ล้านนา)</small><p>{rem.northern}</p></div>
+        <p className="disclaimer">เคล็ดเป็นแนวทางเสริมกำลังใจและเตือนสติเท่านั้น ไม่รับประกันผล ตัวอย่างที่อาจเกิดขึ้นเป็นเพียงภาพประกอบ ไม่ใช่การทำนายที่แน่นอน</p>
       </section>
 
       <section className="block">

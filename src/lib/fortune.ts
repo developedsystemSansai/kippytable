@@ -29,14 +29,16 @@ export type Reading = {
   northern: string;
   yam: string | null;
   shiftTip: string | null;
+  sunEl: Element;                  // element of the natal sun sign
+  branch: Branch;                  // relation between birth-year animal and today's day animal
 };
 
-function hash(s: string): number {
+export function hashStr(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
-const pick = <T,>(arr: T[], seed: string): T => arr[hash(seed) % arr.length];
+const pick = <T,>(arr: T[], seed: string): T => arr[hashStr(seed) % arr.length];
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 
 const ASPECT_ADJ: Record<Aspect, number> = { trine: 1.5, sextile: 1, conjunct: 0.5, minor: 0, square: -1, opposite: -1 };
@@ -159,7 +161,7 @@ export function dailyReading(p: Person, date: string, todayShift?: string | null
     headline: pick(HEADLINE[tier(Math.round(mean))], `${seed}|h`),
     lines,
     luckyColor: WEEKDAY_COLOR[weekdayOf(date)],
-    luckyNumber: (hash(`${seed}|n`) % 9) + 1,
+    luckyNumber: (hashStr(`${seed}|n`) % 9) + 1,
     sunSign: `ราศี${SIGNS[n.sun].th}`,
     ascSign: n.asc != null ? `ราศี${SIGNS[n.asc].th}` : null,
     moonSignToday: `ราศี${SIGNS[sky.moon].th}`,
@@ -170,6 +172,8 @@ export function dailyReading(p: Person, date: string, todayShift?: string | null
     northern: NORTHERN_REL[rel],
     yam: p.birth_time ? YAM_NAMES[yamOf(p.birth_time)] : null,
     shiftTip: tips ? pick(tips, `${seed}|t`) : null,
+    sunEl,
+    branch: rel,
   };
 }
 

@@ -16,10 +16,6 @@ import { preloadFortuneArt } from "./FortuneLoader";
 import ThemeToggle from "./ThemeToggle";
 
 type TabId = "schedule" | "groups" | "income" | "fortune" | "me";
-const TAB_IDS: TabId[] = ["schedule", "groups", "income", "fortune", "me"];
-const NEXT_KEY = "kippy_next";
-const AUTO_KEY = "kippy_autologin";
-const asTab = (v: string | null): TabId | null => (v && (TAB_IDS as string[]).includes(v) ? (v as TabId) : null);
 const TABS: { id: TabId; label: string; icon: IconName }[] = [
   { id: "schedule", label: "ตารางเวร", icon: "calendar-clock" },
   { id: "groups", label: "กลุ่ม", icon: "group" },
@@ -39,12 +35,6 @@ export default function AppShell() {
     return () => clearTimeout(t);
   }, []);
 
-  // Deep link from the LINE rich menu: https://.../?tab=income
-  useEffect(() => {
-    const t = asTab(new URLSearchParams(location.search).get("tab"));
-    if (t) setTab(t);
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -54,18 +44,8 @@ export default function AppShell() {
       } catch (e) {
         if (cancelled) return;
         const msg = e instanceof Error ? e.message : "error";
-        if (msg === "not_logged_in") {
-          // Opened from the LINE app (rich menu): go straight to LINE Login once, no button to press.
-          const wanted = asTab(new URLSearchParams(location.search).get("tab"));
-          if (wanted) sessionStorage.setItem(NEXT_KEY, wanted);
-          const inLine = /\bLine\//i.test(navigator.userAgent);
-          if (inLine && sessionStorage.getItem(AUTO_KEY) !== "1") {
-            sessionStorage.setItem(AUTO_KEY, "1");
-            startLineLogin();
-            return;
-          }
-          setNeedLogin(true);
-        } else setError(msg);
+        if (msg === "not_logged_in") setNeedLogin(true);
+        else setError(msg);
       }
     })();
     return () => {
