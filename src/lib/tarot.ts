@@ -28,6 +28,38 @@ export const TAROT: TarotCard[] = [
   { n: "XXI", th: "โลก", en: "The World", up: "ความสำเร็จครบวงจร จบงานสำคัญ พร้อมเปิดเป้าหมายใหม่", rev: "ใกล้เสร็จแล้วแต่ยังขาดอีกนิด ตรวจสิ่งที่ค้างให้ครบ" },
 ];
 
+export type Mood = "light" | "mystic" | "shadow";
+export type CardMeta = { kw: [string, string, string]; hue: number; mood: Mood };
+
+/** Artwork path for a card (22 slices of the Kippy deck in /public/kippy/tarot). */
+export const cardSrc = (i: number) => `/kippy/tarot/${String(i).padStart(2, "0")}.webp`;
+
+/** Keywords, aura hue (deg) and sparkle mood per card, same order as TAROT. */
+export const META: CardMeta[] = [
+  { kw: ["เริ่มต้นใหม่", "กล้าลอง", "อิสระ"], hue: 48, mood: "light" },
+  { kw: ["ลงมือทำ", "ทักษะ", "สมาธิ"], hue: 275, mood: "mystic" },
+  { kw: ["สัญชาตญาณ", "ความลับ", "สงบนิ่ง"], hue: 250, mood: "mystic" },
+  { kw: ["อุดมสมบูรณ์", "ดูแลใจ", "อบอุ่น"], hue: 340, mood: "light" },
+  { kw: ["มั่นคง", "ระเบียบ", "ผู้นำ"], hue: 12, mood: "light" },
+  { kw: ["คำแนะนำ", "แบบแผน", "ครูผู้ชี้ทาง"], hue: 285, mood: "mystic" },
+  { kw: ["หัวใจ", "ความสัมพันธ์", "การเลือก"], hue: 345, mood: "light" },
+  { kw: ["มุ่งมั่น", "วินัย", "ชัยชนะ"], hue: 220, mood: "light" },
+  { kw: ["ใจนิ่ง", "อดทน", "เมตตา"], hue: 35, mood: "light" },
+  { kw: ["ไตร่ตรอง", "อยู่กับตัวเอง", "คำตอบข้างใน"], hue: 255, mood: "mystic" },
+  { kw: ["จังหวะเปลี่ยน", "โอกาส", "หมุนเวียน"], hue: 46, mood: "light" },
+  { kw: ["เป็นธรรม", "เหตุผล", "ผลของการกระทำ"], hue: 265, mood: "mystic" },
+  { kw: ["มองมุมใหม่", "ปล่อยวาง", "รอจังหวะ"], hue: 260, mood: "mystic" },
+  { kw: ["จบเพื่อเริ่มใหม่", "ปล่อยของเก่า", "เปลี่ยนแปลง"], hue: 275, mood: "shadow" },
+  { kw: ["สมดุล", "พอดี", "ใจเย็น"], hue: 190, mood: "light" },
+  { kw: ["รู้ทันตัวเอง", "สิ่งที่ผูกมัด", "เลือกใหม่ได้"], hue: 6, mood: "shadow" },
+  { kw: ["สั่นไหว", "รื้อแล้วสร้างใหม่", "ตื่นรู้"], hue: 26, mood: "shadow" },
+  { kw: ["ความหวัง", "เยียวยา", "แรงบันดาลใจ"], hue: 52, mood: "light" },
+  { kw: ["ความไม่ชัด", "ความรู้สึกลึก", "อย่าเพิ่งสรุป"], hue: 235, mood: "mystic" },
+  { kw: ["ความสุข", "ความสำเร็จ", "ความชัดเจน"], hue: 48, mood: "light" },
+  { kw: ["ทบทวน", "ให้อภัย", "เริ่มระดับใหม่"], hue: 195, mood: "mystic" },
+  { kw: ["สำเร็จครบวง", "จบรอบ", "เป้าหมายใหม่"], hue: 140, mood: "light" },
+];
+
 export type Draw = { card: number; reversed: boolean };
 
 function rnd(n: number): number {

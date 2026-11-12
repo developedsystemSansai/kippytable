@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { track } from "@/lib/analytics";
 import { deleteHoroProfile, getHoroProfile, listShifts, saveHoroProfile } from "@/lib/data";
 import { addDays, isValidISO, thaiDateLong, todayISO } from "@/lib/dates";
@@ -7,6 +7,7 @@ import { CATS, compatibility, dailyReading, type Compat, type Person, type Readi
 import { shareText } from "@/lib/share";
 import type { HoroProfile } from "@/lib/types";
 import { remedies } from "@/lib/remedies";
+import { Sigil, SparkleBurst, Starfield } from "./Cosmos";
 import FortuneLoader, { preloadFortuneArt } from "./FortuneLoader";
 import KIcon from "./KIcon";
 import Mascot from "./Mascot";
@@ -16,7 +17,64 @@ const STREAK_KEY = "kippy_fortune_streak";
 const SEEN_KEY = "kippy_fortune_seen";
 
 function Stars({ n }: { n: number }) {
-  return <span className="stars" aria-label={`${n} จาก 5 ดาว`}>{"★".repeat(n)}<i>{"★".repeat(5 - n)}</i></span>;
+  return (
+    <span className="stars" aria-label={`${n} จาก 5 ดาว`}>
+      {Array.from({ length: n }, (_, i) => <b key={i} aria-hidden style={{ "--k": i } as CSSProperties}>★</b>)}
+      <i aria-hidden>{"★".repeat(5 - n)}</i>
+    </span>
+  );
+}
+
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function useCountUp(target: number, ms = 1400): number {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    if (reducedMotion()) { setV(target); return; }
+    let raf = 0; const t0 = performance.now();
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / ms);
+      setV(Math.round(target * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
+
+const RING_C = 2 * Math.PI * 52;
+const tierOf = (n: number) => (n >= 85 ? "ดวงเฉิดฉาย" : n >= 70 ? "ดวงดี" : n >= 50 ? "ดวงกลางๆ" : "ดวงพักตัว");
+
+/** Night-sky hero: a daily sigil generated from birth date + day, a filling score ring, and a sparkle burst on high scores. */
+function FortuneHero({ r, person, date }: { r: Reading; person: Person; date: string }) {
+  const shown = useCountUp(r.overall);
+  const high = r.overall >= 80;
+  return (
+    <div className={`fhero${high ? " is-high" : ""}`} style={{ "--hue": r.luckyColor.hex } as CSSProperties}>
+      <div className="fhero-bg" aria-hidden><Starfield seed={`hero|${person.birth_date}|${date}`} density={0.9} /></div>
+      <div className="fhero-stage">
+        <Sigil seed={`${person.birth_date}|${date}`} power={r.overall} size={272} />
+        <div className="fhero-ring" role="img" aria-label={`ดวงรวม ${r.overall} เปอร์เซ็นต์`}>
+          <svg viewBox="0 0 120 120" aria-hidden>
+            <circle cx="60" cy="60" r="52" className="ring-track" />
+            <circle cx="60" cy="60" r="52" className="ring-fill" style={{ "--c": RING_C, strokeDasharray: RING_C, strokeDashoffset: RING_C * (1 - r.overall / 100) } as CSSProperties} />
+          </svg>
+          <span className="fhero-num"><small>ดวงรวม</small><b>{shown}<i>%</i></b></span>
+        </div>
+        <SparkleBurst fireKey={high ? 1 : 0} mood="light" hue={48} power={1.2} />
+      </div>
+      <span className="fhero-tier">{tierOf(r.overall)}</span>
+      <strong className="fhero-head">{r.headline}</strong>
+      <div className="chips chips-night">
+        <span className="chip"><span className="dot" style={{ background: r.luckyColor.hex }} />สีมงคล {r.luckyColor.name}</span>
+        <span className="chip">เลขนำโชค {r.luckyNumber}</span>
+        <span className="chip">{r.sunSign}</span>
+        {r.ascSign && <span className="chip">ลัคนา{r.ascSign.replace("ราศี", "")}</span>}
+        <span className="chip">{r.lannaYear}</span>
+      </div>
+    </div>
+  );
 }
 
 /** Counts consecutive days the reading was opened (stored on this device only). */
@@ -190,30 +248,18 @@ export default function FortuneTab() {
         </div>
         <p className="muted">{thaiDateLong(date)}{streak > 1 ? ` · เปิดดูต่อเนื่อง ${streak} วัน` : ""}</p>
 
-        <div className="fortune-hero">
-          <span className="muted">ดวงรวม</span>
-          <span className="big">{r.overall}%</span>
-          <div className="bar" aria-hidden><span style={{ width: `${r.overall}%` }} /></div>
-          <strong>{r.headline}</strong>
-          <div className="chips">
-            <span className="chip"><span className="dot" style={{ background: r.luckyColor.hex }} />สีมงคล {r.luckyColor.name}</span>
-            <span className="chip">เลขนำโชค {r.luckyNumber}</span>
-            <span className="chip">{r.sunSign}</span>
-            {r.ascSign && <span className="chip">ลัคนา{r.ascSign.replace("ราศี", "")}</span>}
-            <span className="chip">{r.lannaYear}</span>
-          </div>
-        </div>
+        <FortuneHero key={date} r={r} person={person} date={date} />
 
         <div>
           {CATS.map((c) => (
-            <div key={c.key} className="cat-row">
+            <div key={c.key} className="cat-row rise" style={{ "--i": CATS.indexOf(c) } as CSSProperties}>
               <div className="cat-head"><span>{c.th}</span><Stars n={r.stars[c.key]} /></div>
               <p>{r.lines[c.key]}</p>
             </div>
           ))}
         </div>
 
-        {r.shiftTip && <div className="bubble reply"><small>เคล็ดลับตามเวรของคุณ</small><p>{r.shiftTip}</p></div>}
+        {r.shiftTip && <div className="bubble reply rise" style={{ "--i": 5 } as CSSProperties}><small>เคล็ดลับตามเวรของคุณ</small><p>{r.shiftTip}</p></div>}
 
         <button className="btn quiet" style={{ gap: 8 }} onClick={() => { shareText(shareMsg, "คัดลอกดวงแล้ว"); track("share_fortune"); }}>
           <Mascot pose="love" size={28} />แชร์ดวงวันนี้

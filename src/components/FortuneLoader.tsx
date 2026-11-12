@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { SparkleBurst, Starfield } from "./Cosmos";
 
 const FRAMES = [0, 1, 2, 3, 4, 5].map((i) => `/kippy/fortune/teller-${i}.webp`);
+const ZODIAC = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"];
 
 const MESSAGES = {
   reading: ["คิปปี้กำลังเตรียมลูกแก้ว…", "กำลังเปิดจักรราศีของคุณ…", "กำลังดูตำแหน่งดวงจันทร์และนักษัตรปีเกิด…", "กำลังรวบรวมพลังดวงดาว…", "ไพ่ใบสำคัญปรากฏแล้ว!", "กำลังสรุปดวงของคุณ…"],
@@ -16,7 +18,10 @@ export function preloadFortuneArt() {
 
 type Props = { duration?: number; variant?: "reading" | "tarot"; onDone: () => void };
 
-/** Fortune-teller mascot animation: 6 frames cross-fading over `duration` ms, then calls onDone. */
+/**
+ * Fortune-teller ceremony: Kippy inside a night sky with an orbiting zodiac ring.
+ * 6 frames cross-fade over `duration` ms; each new frame releases a puff of sparkles. Then calls onDone.
+ */
 export default function FortuneLoader({ duration = 7000, variant = "reading", onDone }: Props) {
   const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const total = reduce ? 1500 : duration;
@@ -37,15 +42,27 @@ export default function FortuneLoader({ duration = 7000, variant = "reading", on
     return () => { clearInterval(tick); clearTimeout(skip); };
   }, [total]);
 
+  const last = frame === FRAMES.length - 1;
+
   return (
     <section className="block loader" role="status" aria-live="polite">
-      <div className="teller-stage" aria-hidden>
-        {FRAMES.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={src} src={src} alt="" width={512} height={512} className="teller-frame" style={{ opacity: i === frame ? 1 : 0 }} />
-        ))}
+      <div className={`lc-panel${last ? " is-last" : ""}`} style={{ "--p": frame / (FRAMES.length - 1) } as CSSProperties}>
+        <div className="lc-bg" aria-hidden><Starfield seed={`loader-${variant}`} density={1.2} /></div>
+        <div className="lc-halo" aria-hidden />
+        <div className="lc-orbit" aria-hidden>
+          {ZODIAC.map((g, i) => (
+            <span key={g} className="lc-glyph" style={{ "--a": `${i * 30}deg`, "--lit": i <= Math.round((frame / (FRAMES.length - 1)) * 11) ? 1 : 0.28 } as CSSProperties}><i>{g}</i></span>
+          ))}
+        </div>
+        <div className="teller-stage" aria-hidden>
+          {FRAMES.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={src} src={src} alt="" width={512} height={512} className="teller-frame" style={{ opacity: i === frame ? 1 : 0 }} />
+          ))}
+          <SparkleBurst fireKey={frame} mood="mystic" hue={48} power={frame === FRAMES.length - 1 ? 1.4 : 0.6} />
+        </div>
       </div>
-      <p className="loader-msg">{MESSAGES[variant][frame]}</p>
+      <p className="loader-msg" key={frame}>{MESSAGES[variant][frame]}</p>
       <div className="loader-bar" aria-hidden><span style={{ animationDuration: `${total}ms` }} /></div>
       <button className="link-btn" style={{ visibility: canSkip ? "visible" : "hidden", justifySelf: "center" }} onClick={() => done.current()}>ข้าม</button>
     </section>

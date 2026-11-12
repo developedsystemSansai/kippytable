@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { getGroupHoroscopes, getHoroProfile } from "@/lib/data";
 import { compatibility, dailyReading, type Person } from "@/lib/fortune";
 import type { GroupHoro, HoroProfile } from "@/lib/types";
@@ -37,11 +37,12 @@ export default function GroupFortune({ groupId, date }: { groupId: string; date:
       ) : (
         <div className="rows">
           {rows.map(({ m, overall, match }, i) => (
-            <div key={m.id} className="row-item">
-              <span className="avatar" aria-hidden>{i + 1}</span>
+            <div key={m.id} className={`row-item gf-row${i === 0 ? " is-top" : ""}`} style={{ "--i": i } as CSSProperties}>
+              <span className="avatar gf-rank" aria-hidden>{i === 0 ? "♛" : i + 1}</span>
               <span className="grow">
                 <span className="title">{m.name || "ไม่ระบุชื่อ"}</span>
                 <span className="muted">{match !== null ? `เข้ากับคุณ ${match}%` : "ตั้งวันเกิดของคุณเพื่อดูความเข้ากัน"}</span>
+                <span className="bar gf-bar" aria-hidden><span style={{ width: `${overall}%` }} /></span>
               </span>
               <strong>{overall}%</strong>
             </div>
