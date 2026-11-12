@@ -24,11 +24,20 @@ const TABS: { id: TabId; label: string; icon: IconName }[] = [
   { id: "me", label: "ฉัน", icon: "profile" },
 ];
 
+const TAB_IDS = TABS.map((t) => t.id);
+const isTab = (v: string | null): v is TabId => !!v && (TAB_IDS as string[]).includes(v);
+
 export default function AppShell() {
   const [tab, setTab] = useState<TabId>("schedule");
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needLogin, setNeedLogin] = useState(false);
+
+  // Rich-menu buttons open /?tab=income etc.: honour it once on load.
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get("tab");
+    if (isTab(t)) setTab(t);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(preloadFortuneArt, 4000);
@@ -59,7 +68,7 @@ export default function AppShell() {
         <Mascot pose="hello" size={120} />
         <Logo size={30} markless />
         <p className="muted">เข้าสู่ระบบเพื่อดูตารางเวรของคุณ</p>
-        <button className="btn" onClick={startLineLogin}>เข้าสู่ระบบด้วย LINE</button>
+        <button className="btn" onClick={() => startLineLogin()}>เข้าสู่ระบบด้วย LINE</button>
       </main>
     );
   }
