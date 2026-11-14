@@ -4,7 +4,9 @@ import { track } from "@/lib/analytics";
 import { todayISO } from "@/lib/dates";
 import type { Person } from "@/lib/fortune";
 import { shareText } from "@/lib/share";
-import { META, SPREAD_LABELS, TAROT, cardSrc, dailyDraw, drawSpread, exampleOf, spreadStory, spreadSummary, type Draw } from "@/lib/tarot";
+import { META, SPREAD_LABELS, TAROT, cardLuck, cardSrc, dailyDraw, drawSpread, exampleOf, luckNote, spreadStory, spreadSummary, type Draw, type Mood } from "@/lib/tarot";
+import { MILESTONES, collectedCount, keepCard, loadBook, markDaily, releaseCard, saveBook, type Book, type Decision } from "@/lib/tarotBook";
+import TarotAlbum from "./TarotAlbum";
 import { SparkleBurst, Starfield } from "./Cosmos";
 
 type Mode = "daily" | "three";
@@ -41,14 +43,23 @@ function Deck({ shuffling, onTap }: { shuffling: boolean; onTap?: () => void }) 
   );
 }
 
-function Card({ d, index, label, flipped, onFlip }: { d: Draw; index: number; label?: string; flipped: boolean; onFlip: () => void }) {
+function Card({ d, index, label, flipped, onFlip, decision, pre }: { d: Draw; index: number; label?: string; flipped: boolean; onFlip: () => void; decision: Decision; pre: boolean }) {
   const c = TAROT[d.card], m = META[d.card];
   const ref = useRef<HTMLButtonElement>(null);
   const [burst, setBurst] = useState(0);
+  const [fx, setFx] = useState<{ mood: Mood; hue: number; power: number } | null>(null);
+  const released = decision === "release" && !pre;
+
+  // keeping lights the card gold; releasing lets it drift away as embers
+  useEffect(() => {
+    if (!decision || pre) return;
+    setFx(decision === "keep" ? { mood: "light", hue: 48, power: 1.3 } : { mood: "shadow", hue: 20, power: 1 });
+    setBurst((k) => k + 1);
+  }, [decision, pre]);
 
   function flip() {
     if (flipped) return;
-    onFlip(); setBurst((k) => k + 1);
+    setFx(null); onFlip(); setBurst((k) => k + 1);
     try { navigator.vibrate?.(d.card === 16 || d.card === 13 ? [18, 40, 28] : 18); } catch {}
   }
   // holographic tilt: only after the card is face up
@@ -62,11 +73,11 @@ function Card({ d, index, label, flipped, onFlip }: { d: Draw; index: number; la
   function leave() { const el = ref.current; if (!el) return; el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); delete el.dataset.hot; }
 
   return (
-    <div className="tcard-wrap deal" style={{ "--i": index, "--h": m.hue } as CSSProperties}>
+    <div className={`tcard-wrap deal${decision === "keep" ? " kept" : ""}${released ? " released" : ""}`} style={{ "--i": index, "--h": m.hue } as CSSProperties}>
       {label && <small className="tlabel">{label}</small>}
       <div className="tcard-slot">
         <span className={`taura${flipped ? " on" : ""}${d.reversed ? " rev" : ""}`} aria-hidden />
-        <button ref={ref} className={`tcard${flipped ? " is-flipped" : ""}${d.reversed ? " is-rev" : ""}`} onClick={flip}
+        <button ref={ref} disabled={released} className={`tcard${flipped ? " is-flipped" : ""}${d.reversed ? " is-rev" : ""}`} onClick={flip}
           onPointerMove={move} onPointerLeave={leave} onPointerUp={(e) => { if (e.pointerType !== "mouse") leave(); }}
           aria-label={flipped ? `${c.th} ${c.en}${d.reversed ? " (กลับหัว)" : ""}` : "ไพ่คว่ำ แตะเพื่อเปิด"}>
           <span className="tcard-tilt">
@@ -81,14 +92,17 @@ function Card({ d, index, label, flipped, onFlip }: { d: Draw; index: number; la
             </span>
           </span>
         </button>
-        <SparkleBurst fireKey={burst} mood={d.reversed && m.mood === "light" ? "mystic" : m.mood} hue={m.hue} power={d.reversed ? 0.7 : 1} />
+        {decision === "keep" && <span className="tkeep-ribbon">เก็บแล้ว</span>}
+        {released && <span className="trelease-note">ปล่อยแล้ว</span>}
+        <SparkleBurst fireKey={burst} mood={fx?.mood ?? (d.reversed && m.mood === "light" ? "mystic" : m.mood)} hue={fx?.hue ?? m.hue} power={fx?.power ?? (d.reversed ? 0.7 : 1)} />
       </div>
     </div>
   );
 }
 
-function Reading({ d, label, i }: { d: Draw; label?: string; i: number }) {
-  const c = TAROT[d.card], m = META[d.card];
+type Fate = { decision: Decision; pre: boolean; fresh: boolean; count: number };
+function Reading({ d, label, i, fate, onKeep, onRelease, onAlbum }: { d: Draw; label?: string; i: number; fate: Fate; onKeep: () => void; onRelease: () => void; onAlbum: () => void }) {
+  const c = TAROT[d.card], m = META[d.card], luck = cardLuck(d);
   return (
     <article className="treading" style={{ "--h": m.hue, "--d": `${i * 60}ms` } as CSSProperties}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -102,6 +116,25 @@ function Reading({ d, label, i }: { d: Draw; label?: string; i: number }) {
         </div>
         <p>{d.reversed ? c.rev : c.up}</p>
         <div className="ex"><span className="ex-tag">ตัวอย่าง</span><p>{exampleOf(d)}</p></div>
+        <div className="tkeep">
+          <span className="tluck" aria-label={`พลังไพ่ ${luck} จาก 5`}>พลังไพ่ <b>{"★".repeat(luck)}</b><i>{"★".repeat(5 - luck)}</i></span>
+          {fate.decision === null ? (
+            <>
+              <p className="tkeep-hint">{luckNote(luck)}{fate.count > 0 ? ` (คุณมีใบนี้แล้ว ×${fate.count})` : ""}</p>
+              <div className="tkeep-row">
+                <button className="btn" onClick={onKeep}>เก็บไว้ในสมุดไพ่</button>
+                <button className="btn quiet" onClick={onRelease}>ปล่อยไป</button>
+              </div>
+            </>
+          ) : fate.decision === "keep" ? (
+            <p className="tkeep-done is-keep">
+              {fate.pre ? "วันนี้คุณเก็บไพ่ใบนี้ไว้แล้ว" : fate.fresh ? "ไพ่ใหม่! เก็บเข้าสมุดแล้ว" : `เก็บเพิ่มแล้ว (มีใบนี้ ×${fate.count})`}{" "}
+              <button className="link-btn" onClick={onAlbum}>ดูสมุดไพ่</button>
+            </p>
+          ) : (
+            <p className="tkeep-done">{fate.pre ? "วันนี้คุณปล่อยไพ่ใบนี้ไปแล้ว" : "ปล่อยไพ่แล้ว ขอบคุณที่เตือนใจ ปล่อยวางได้เลย"}</p>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -114,10 +147,19 @@ export default function Tarot({ person }: { person: Person }) {
   const [flipped, setFlipped] = useState<boolean[]>([]);
   const [msg, setMsg] = useState(0);
   const [cutBurst, setCutBurst] = useState(0);
+  const [sub, setSub] = useState<"draw" | "album">("draw");
+  const [book, setBook] = useState<Book>(() => loadBook());
+  const [decided, setDecided] = useState<Decision[]>([]);
+  const [fresh, setFresh] = useState<boolean[]>([]);
+  const [pre, setPre] = useState(false);
+  const [celebrate, setCelebrate] = useState<number | null>(null);
 
   function start() {
     const next = mode === "daily" ? [dailyDraw(person.birth_date, todayISO())] : drawSpread(3);
+    const today = todayISO();
+    const already = mode === "daily" && book.daily?.date === today ? book.daily.d : null;
     setCards(next); setFlipped(next.map(() => false)); setMsg(0); setPhase("shuffle");
+    setDecided(next.map(() => already)); setFresh(next.map(() => false)); setPre(!!already); setCelebrate(null);
     track("tarot_draw", { mode });
   }
 
@@ -136,8 +178,33 @@ export default function Tarot({ person }: { person: Person }) {
   };
   const openCount = flipped.filter(Boolean).length;
 
+  function decide(i: number, dec: "keep" | "release") {
+    if (decided[i]) return;
+    const d = cards[i], date = todayISO();
+    let b = book, isNew = false;
+    if (dec === "keep") {
+      const r = keepCard(b, d, date); b = r.book; isNew = r.isNew;
+      if (r.milestone) setCelebrate(r.milestone);
+    } else b = releaseCard(b);
+    if (mode === "daily") b = markDaily(b, date, dec);
+    setBook(b); saveBook(b);
+    setDecided((a) => a.map((v, k) => (k === i ? dec : v)));
+    setFresh((a) => a.map((v, k) => (k === i ? isNew : v)));
+    try { navigator.vibrate?.(dec === "keep" ? [14, 30, 14] : 24); } catch {}
+    track(dec === "keep" ? "tarot_keep" : "tarot_release", { card: d.card, reversed: d.reversed ? 1 : 0 });
+  }
+  const tabs = (
+    <div className="seg-wrap" role="group" aria-label="ส่วนของไพ่ทาโร่">
+      <button aria-pressed={sub === "draw"} onClick={() => setSub("draw")}>เปิดไพ่</button>
+      <button aria-pressed={sub === "album"} onClick={() => setSub("album")}>สมุดไพ่ ({collectedCount(book)}/22)</button>
+    </div>
+  );
+
+  if (sub === "album") return <>{tabs}<TarotAlbum book={book} onChange={setBook} onDraw={() => setSub("draw")} /></>;
+
   return (
     <>
+      {tabs}
       <section className="block">
         <h2>เปิดไพ่ทาโร่กับคิปปี้</h2>
         <p className="muted">ตั้งใจนึกถึงเรื่องที่อยากรู้ แล้วเลือกรูปแบบการเปิดไพ่</p>
@@ -169,7 +236,7 @@ export default function Tarot({ person }: { person: Person }) {
               <>
                 <div className={`tspread${cards.length === 1 ? " one" : ""}`}>
                   {cards.map((d, i) => (
-                    <Card key={`${d.card}-${i}`} d={d} index={i} label={mode === "three" ? SPREAD_LABELS[i] : undefined} flipped={flipped[i]}
+                    <Card key={`${d.card}-${i}`} d={d} index={i} label={mode === "three" ? SPREAD_LABELS[i] : undefined} flipped={flipped[i]} decision={decided[i] ?? null} pre={pre}
                       onFlip={() => setFlipped((f) => f.map((v, k) => (k === i ? true : v)))} />
                   ))}
                 </div>
@@ -185,9 +252,20 @@ export default function Tarot({ person }: { person: Person }) {
 
       {phase === "dealt" && (
         <section className="block">
+          {celebrate !== null && (
+            <div className={`tcelebrate${celebrate === 22 ? " full" : ""}`} role="status">
+              <SparkleBurst fireKey={1} mood="light" hue={48} power={celebrate === 22 ? 2.4 : 1.4} />
+              <strong>{celebrate === 22 ? "ครบสำรับแล้ว!" : `เก็บแล้ว ${celebrate} ใบ`}</strong>
+              <span>{MILESTONES[celebrate]}</span>
+            </div>
+          )}
           {openCount > 0 && (
             <div className="treadings" aria-live="polite">
-              {cards.map((d, i) => flipped[i] && <Reading key={`${d.card}-${i}`} d={d} i={i} label={mode === "three" ? SPREAD_LABELS[i] : undefined} />)}
+              {cards.map((d, i) => flipped[i] && (
+                <Reading key={`${d.card}-${i}`} d={d} i={i} label={mode === "three" ? SPREAD_LABELS[i] : undefined}
+                  fate={{ decision: decided[i] ?? null, pre, fresh: !!fresh[i], count: book.cards[d.card]?.count ?? 0 }}
+                  onKeep={() => decide(i, "keep")} onRelease={() => decide(i, "release")} onAlbum={() => setSub("album")} />
+              ))}
             </div>
           )}
           {mode === "three" && allOpen && (

@@ -121,3 +121,15 @@ export function spreadSummary(d: Draw[]): string {
 export function spreadStory(d: Draw[]): string[] {
   return d.map((x, i) => `${SPREAD_LABELS[i]}: ${exampleOf(x).replace(/^เช่น\s*/, "")}`);
 }
+
+/** Overall energy of a card as people usually read it: [upright, reversed], 1..5. Heuristic, for keep/release hints only. */
+const LUCK: [number, number][] = [
+  [4, 2], [4, 2], [4, 3], [5, 3], [4, 3], [4, 3], [5, 2], [4, 2], [5, 2], [3, 2], [4, 2],
+  [4, 2], [3, 2], [3, 2], [5, 2], [2, 4], [2, 3], [5, 2], [2, 4], [5, 3], [4, 2], [5, 3],
+];
+export const cardLuck = (d: { card: number; reversed: boolean }): number => LUCK[d.card][d.reversed ? 1 : 0];
+export function luckNote(luck: number): string {
+  return luck >= 4 ? "ไพ่ใบนี้พลังดี น่าเก็บไว้เป็นกำลังใจ"
+    : luck === 3 ? "ไพ่กลางๆ เก็บไว้เป็นบทเรียน หรือปล่อยผ่านไปก็ได้"
+    : "ไพ่เตือนใจ อ่านแล้วปล่อยวางได้ หรือจะเก็บไว้เตือนตัวเองก็ได้";
+}

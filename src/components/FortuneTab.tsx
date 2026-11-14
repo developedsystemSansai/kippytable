@@ -8,6 +8,7 @@ import { shareText } from "@/lib/share";
 import type { HoroProfile } from "@/lib/types";
 import { remedies } from "@/lib/remedies";
 import { Sigil, SparkleBurst, Starfield } from "./Cosmos";
+import FortuneTrend from "./FortuneTrend";
 import FortuneLoader, { preloadFortuneArt } from "./FortuneLoader";
 import KIcon from "./KIcon";
 import Mascot from "./Mascot";
@@ -166,7 +167,7 @@ export default function FortuneTab() {
   const [shiftLabel, setShiftLabel] = useState<string | null>(null);
   const [streak, setStreak] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<"reading" | "tarot">("reading");
+  const [view, setView] = useState<"reading" | "tarot" | "trend">("reading");
   // dates whose reveal animation already played in this browser session
   const [seen, setSeen] = useState<string[]>(() => {
     try { return JSON.parse(sessionStorage.getItem(SEEN_KEY) ?? "[]") as string[]; } catch { return []; }
@@ -218,9 +219,11 @@ export default function FortuneTab() {
       <div className="seg" role="group" aria-label="เลือกหมวด">
         <button aria-pressed={view === "reading"} onClick={() => setView("reading")}>ดวงรายวัน</button>
         <button aria-pressed={view === "tarot"} onClick={() => setView("tarot")}>ไพ่ทาโร่</button>
+        <button aria-pressed={view === "trend"} onClick={() => setView("trend")}>แนวโน้มดวง</button>
       </div>
     </section>
   );
+  if (view === "trend") return <>{viewSwitch}<FortuneTrend person={person} /></>;
   if (view === "tarot") return <>{viewSwitch}<Tarot person={person} /></>;
 
   if (!seen.includes(date)) {
