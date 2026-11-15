@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { deleteShifts, getMyPay, saveShifts } from "@/lib/data";
 import { thaiDateLong } from "@/lib/dates";
@@ -73,10 +73,19 @@ export default function ShiftSheet({ dates, existing, onClose, onChanged }: Prop
       track("delete_shift", { days: dates.length });
     }, "deleted");
 
+  // Dialog basics: move focus in, close on Escape.
+  const dlg = useRef<HTMLDivElement>(null);
+  useEffect(() => { dlg.current?.focus(); }, []);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+
   return (
     <>
       <div className="backdrop" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={`ลงเวร ${title}`}>
+      <div ref={dlg} tabIndex={-1} className="sheet" role="dialog" aria-modal="true" aria-label={`ลงเวร ${title}`}>
         <h2>{title}</h2>
 
         <div className="pick" role="group" aria-label="เลือกประเภทเวร">

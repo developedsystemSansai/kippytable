@@ -613,3 +613,18 @@ h2 { letter-spacing: -.01em; }
   .btn:not([disabled]):hover { filter: brightness(1.07); }
   .btn.quiet:not([disabled]):hover, .btn-line:not([disabled]):hover { border-color: var(--brand); }
 }
+
+/* ---------- v3.1: accessibility pass (WCAG 2.1 AA) ---------- */
+:root { --edge: color-mix(in srgb, var(--ink) 50%, var(--ground)); }
+/* form fields need a 3:1 boundary (1.4.11); hairline --rule is only ~1.4:1 */
+.field input, .field textarea, .field select { border-color: var(--edge); }
+.sheet:focus { outline: none; }
+/* past days: keep date numerals at full muted colour (opacity .7 dropped them below 4.5:1) */
+.cell.past .cell-n { opacity: 1; }
+/* 44px minimum targets (2.5.5) */
+.btn-line, .seg button { min-height: 44px; }
+.seg button { padding-top: 10px; padding-bottom: 10px; }
+/* star ratings: amber on white was 2.2:1; mix toward ink in either theme */
+.stars { color: color-mix(in srgb, #e2a400 60%, var(--ink)); }
+/* the roster is the product: give the month a clearer title */
+.month-switch h2 { font-size: 1.25rem; }
