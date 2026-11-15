@@ -7,7 +7,8 @@ export type Shift = {
   note: string;
 };
 
-export type Me = { id: string; name: string; picture: string | null; is_admin: boolean; position_code: string | null };
+export type Me = { id: string; name: string; picture: string | null; is_admin: boolean; position_code: string | null; profession_code: string | null; start_date: string | null };
+export type Profession = { code: string; name: string; grp: string; pay_position: string; sort: number };
 
 export type PayPosition = { code: string; name: string; sort: number };
 export type PayRate = { position_code: string; shift: string; pay: number; per_hours: number; note: string };

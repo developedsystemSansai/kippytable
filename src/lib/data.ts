@@ -2,7 +2,7 @@
 import { supabase, ensureSession } from "./supabase";
 import { shiftMonth } from "./dates";
 import type {
-  AdminMessage, Group, GroupHoro, GroupMemberDay, HoroProfile, IncomeMonth, Me, Message, PayPosition, PayRate, Shift,
+  AdminMessage, Group, GroupHoro, GroupMemberDay, HoroProfile, IncomeMonth, Me, Message, PayPosition, PayRate, Profession, Shift,
 } from "./types";
 
 function fail(error: { message: string } | null): asserts error is null {
@@ -14,12 +14,12 @@ export type ShiftFields = Omit<Shift, "date">;
 export async function getMe(): Promise<Me> {
   const uid = await ensureSession();
   const sb = supabase();
-  const full = await sb.from("profiles").select("id,name,picture,is_admin,position_code").eq("id", uid).single();
+  const full = await sb.from("profiles").select("id,name,picture,is_admin,position_code,profession_code,start_date").eq("id", uid).single();
   if (!full.error) return full.data as Me;
   // Migration 20261111000000 not applied yet: fall back so the app still opens.
   const basic = await sb.from("profiles").select("id,name,picture").eq("id", uid).single();
   fail(basic.error);
-  return { ...(basic.data as { id: string; name: string; picture: string | null }), is_admin: false, position_code: null };
+  return { ...(basic.data as { id: string; name: string; picture: string | null }), is_admin: false, position_code: null, profession_code: null, start_date: null };
 }
 
 export async function listShifts(month: string): Promise<Shift[]> {
@@ -138,6 +138,24 @@ export async function getMyPay(): Promise<{ position: PayPosition | null; rates:
   const rates: Record<string, PayRate> = {};
   if (position) for (const r of cfg.rates) if (r.position_code === position.code) rates[r.shift] = r;
   return { position, rates };
+}
+
+let professionsCache: Promise<Profession[]> | null = null;
+export function getProfessions(): Promise<Profession[]> {
+  professionsCache ??= (async () => {
+    await ensureSession();
+    const { data, error } = await supabase().from("professions").select("code,name,grp,pay_position,sort").order("sort");
+    fail(error);
+    return (data ?? []) as Profession[];
+  })().catch((e) => { professionsCache = null; throw e; });
+  return professionsCache;
+}
+
+/** Saves profession + start date. position=null lets the server pick the profession's default pay group. */
+export async function setMyWork(profession: string | null, start: string | null, position: string | null): Promise<void> {
+  await ensureSession();
+  const { error } = await supabase().rpc("set_my_work", { p_profession: profession, p_start: start, p_position: position });
+  fail(error);
 }
 
 export async function setMyPosition(code: string | null): Promise<void> {

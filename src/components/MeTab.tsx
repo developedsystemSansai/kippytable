@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { deleteMyAccount, getPayConfig, setMyPosition } from "@/lib/data";
+import { deleteMyAccount, getPayConfig, getProfessions, setMyPosition, setMyWork } from "@/lib/data";
+import { todayISO } from "@/lib/dates";
+import { tenure, tenureText } from "@/lib/tenure";
 import { supabase } from "@/lib/supabase";
 import { getThemeMode, setThemeMode, type ThemeMode } from "@/lib/theme";
-import type { Me, PayPosition } from "@/lib/types";
+import type { Me, PayPosition, Profession } from "@/lib/types";
 import AdminPanel from "./AdminPanel";
 import ContactAdmin from "./ContactAdmin";
 import { THEME_LABEL } from "./ThemeToggle";
@@ -12,17 +14,31 @@ import KIcon from "./KIcon";
 
 const THEME_MODES: ThemeMode[] = ["day", "night", "auto", "system"];
 
+const WORK_ERRORS: Record<string, string> = {
+  invalid_start_date: "วันที่เริ่มงานไม่ถูกต้อง (ต้องไม่เกินวันนี้)",
+  invalid_profession: "ไม่พบวิชาชีพที่เลือก",
+  invalid_position: "ไม่พบตำแหน่งที่เลือก",
+};
+
 export default function MeTab({ me }: { me: Me }) {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"main" | "admin">("main");
   const [positions, setPositions] = useState<PayPosition[]>([]);
   const [position, setPosition] = useState(me.position_code ?? "");
   const [saved, setSaved] = useState(false);
+  const [professions, setProfessions] = useState<Profession[]>([]);
+  const [profession, setProfession] = useState(me.profession_code ?? "");
+  const [start, setStart] = useState(me.start_date ?? "");
+  const [base, setBase] = useState({ profession: me.profession_code ?? "", start: me.start_date ?? "" });
+  const [workBusy, setWorkBusy] = useState(false);
+  const [workSaved, setWorkSaved] = useState(false);
+  const [workError, setWorkError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>("system");
 
   useEffect(() => {
     setTheme(getThemeMode());
     getPayConfig().then((c) => setPositions(c.positions)).catch(() => {});
+    getProfessions().then(setProfessions).catch(() => {});
   }, []);
 
   async function logout() {
@@ -48,6 +64,26 @@ export default function MeTab({ me }: { me: Me }) {
     catch (e) { setError(e instanceof Error ? e.message : "error"); }
   }
 
+  const groups = new Map<string, Profession[]>();
+  for (const p of professions) groups.set(p.grp, [...(groups.get(p.grp) ?? []), p]);
+  const t = start ? tenure(start) : null;
+  const dirty = profession !== base.profession || start !== base.start;
+
+  async function saveWork() {
+    setWorkBusy(true); setWorkSaved(false); setWorkError(null);
+    const changed = profession !== base.profession;
+    try {
+      await setMyWork(profession || null, start || null, changed ? null : position || null);
+      const mapped = professions.find((p) => p.code === profession)?.pay_position;
+      if (changed && mapped) setPosition(mapped);
+      setBase({ profession, start });
+      setWorkSaved(true);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setWorkError(WORK_ERRORS[m] ?? (m || "บันทึกไม่สำเร็จ"));
+    } finally { setWorkBusy(false); }
+  }
+
   if (view === "admin" && me.is_admin) return <AdminPanel onBack={() => setView("main")} />;
 
   return (
@@ -65,6 +101,26 @@ export default function MeTab({ me }: { me: Me }) {
         </div>
         {me.is_admin && <button className="btn" onClick={() => setView("admin")} style={{ gap: 8 }}><KIcon name="gear" size={22} />จัดการระบบ (แอดมิน)</button>}
         <button className="btn quiet" onClick={logout} style={{ gap: 8 }}><KIcon name="door" size={22} />ออกจากระบบ</button>
+      </section>
+
+      <section className="block">
+        <h2 className="heading-icon"><KIcon name="profile" size={24} />วิชาชีพและอายุงาน</h2>
+        <label className="field">วิชาชีพ
+          <select value={profession} onChange={(e) => { setProfession(e.target.value); setWorkSaved(false); }}>
+            <option value="">ยังไม่เลือก</option>
+            {[...groups].map(([g, list]) => (
+              <optgroup key={g} label={g}>{list.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</optgroup>
+            ))}
+          </select>
+        </label>
+        <label className="field">วันที่เริ่มทำงาน
+          <input type="date" value={start} min="1950-01-01" max={todayISO()} onChange={(e) => { setStart(e.target.value); setWorkSaved(false); }} />
+        </label>
+        {t && <p className="tenure" role="status"><span className="muted">อายุงาน</span><b>{tenureText(t)}</b></p>}
+        {start && !t && <p className="error" role="alert">วันที่เริ่มงานต้องไม่เกินวันนี้</p>}
+        <button className="btn" onClick={saveWork} disabled={workBusy || !dirty || (!!start && !t)}>บันทึกข้อมูลการทำงาน</button>
+        {workSaved && <p className="hint" role="status">บันทึกข้อมูลการทำงานแล้ว{profession ? " กลุ่มค่าเวรถูกตั้งตามวิชาชีพ เปลี่ยนได้ด้านล่าง" : ""}</p>}
+        {workError && <p className="error" role="alert">{workError}</p>}
       </section>
 
       <section className="block">
