@@ -2,7 +2,7 @@
 import { supabase, ensureSession } from "./supabase";
 import { shiftMonth } from "./dates";
 import type {
-  AdminMessage, Group, GroupHoro, GroupMemberDay, HoroProfile, IncomeMonth, Me, Message, PayPosition, PayRate, Profession, Shift,
+  AdminMessage, Group, GroupHoro, GroupMemberDay, HoroProfile, IncomeMonth, Me, Message, PayPosition, PayRate, Profession, Shift, WorkEntry,
 } from "./types";
 
 function fail(error: { message: string } | null): asserts error is null {
@@ -14,12 +14,12 @@ export type ShiftFields = Omit<Shift, "date">;
 export async function getMe(): Promise<Me> {
   const uid = await ensureSession();
   const sb = supabase();
-  const full = await sb.from("profiles").select("id,name,picture,is_admin,position_code,profession_code,start_date").eq("id", uid).single();
+  const full = await sb.from("profiles").select("id,name,picture,is_admin,position_code,profession_code,start_date,workplace,picture_custom").eq("id", uid).single();
   if (!full.error) return full.data as Me;
   // Migration 20261111000000 not applied yet: fall back so the app still opens.
   const basic = await sb.from("profiles").select("id,name,picture").eq("id", uid).single();
   fail(basic.error);
-  return { ...(basic.data as { id: string; name: string; picture: string | null }), is_admin: false, position_code: null, profession_code: null, start_date: null };
+  return { ...(basic.data as { id: string; name: string; picture: string | null }), is_admin: false, position_code: null, profession_code: null, start_date: null, workplace: null, picture_custom: false };
 }
 
 export async function listShifts(month: string): Promise<Shift[]> {
@@ -104,7 +104,8 @@ export async function getGroupDay(id: string, date: string): Promise<GroupDetail
 }
 
 export async function deleteMyAccount(): Promise<void> {
-  await ensureSession();
+  const uid = await ensureSession();
+  await pruneAvatars(uid).catch(() => {}); // storage objects are not removed by the DB cascade
   const { error } = await supabase().rpc("delete_my_account");
   fail(error);
   await supabase().auth.signOut();
@@ -138,6 +139,66 @@ export async function getMyPay(): Promise<{ position: PayPosition | null; rates:
   const rates: Record<string, PayRate> = {};
   if (position) for (const r of cfg.rates) if (r.position_code === position.code) rates[r.shift] = r;
   return { position, rates };
+}
+
+export async function setMyWorkplace(text: string | null): Promise<void> {
+  await ensureSession();
+  const { error } = await supabase().rpc("set_my_workplace", { p_text: text });
+  fail(error);
+}
+
+// ------------------------------------------------------------------ work history
+export type WorkEntryInput = Omit<WorkEntry, "id">;
+
+export async function listWorkHistory(): Promise<WorkEntry[]> {
+  await ensureSession();
+  const { data, error } = await supabase().from("work_history").select("id,org,role,start_date,end_date").order("start_date", { ascending: false });
+  fail(error);
+  return (data ?? []) as WorkEntry[];
+}
+
+export async function saveWorkEntry(id: string | null, e: WorkEntryInput): Promise<void> {
+  await ensureSession();
+  const sb = supabase();
+  const { error } = id ? await sb.from("work_history").update(e).eq("id", id) : await sb.from("work_history").insert(e);
+  fail(error);
+}
+
+export async function deleteWorkEntry(id: string): Promise<void> {
+  await ensureSession();
+  const { error } = await supabase().from("work_history").delete().eq("id", id);
+  fail(error);
+}
+
+// ------------------------------------------------------------------ avatar
+async function pruneAvatars(uid: string, keepName?: string): Promise<void> {
+  const bucket = supabase().storage.from("avatars");
+  const { data } = await bucket.list(uid, { limit: 100 });
+  const old = (data ?? []).filter((f) => f.name !== keepName).map((f) => `${uid}/${f.name}`);
+  if (old.length) await bucket.remove(old);
+}
+
+/** Uploads an already-resized JPEG, makes it the profile photo and deletes the previous ones. */
+export async function uploadAvatar(blob: Blob): Promise<string> {
+  const uid = await ensureSession();
+  const sb = supabase();
+  const name = `${crypto.randomUUID().replace(/-/g, "")}.jpg`;
+  const path = `${uid}/${name}`;
+  const up = await sb.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+  fail(up.error);
+  const url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+  const { error } = await sb.rpc("set_my_avatar", { p_url: url });
+  if (error) { await sb.storage.from("avatars").remove([path]).catch(() => {}); fail(error); }
+  await pruneAvatars(uid, name).catch(() => {});
+  return url;
+}
+
+/** Back to the LINE profile photo. */
+export async function removeAvatar(): Promise<void> {
+  const uid = await ensureSession();
+  const { error } = await supabase().rpc("set_my_avatar", { p_url: null });
+  fail(error);
+  await pruneAvatars(uid).catch(() => {});
 }
 
 let professionsCache: Promise<Profession[]> | null = null;
